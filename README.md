@@ -19,7 +19,11 @@ DB: SQLite. This blog is used and read by one person, so a lightweight setup is 
 
 ### Authoring requirements
 
-- Support Markdown-based writing, with a rendered preview before publishing.
+- Support writing posts in Markdown.
+- Render Markdown while writing so the author can see the formatted result in a Notion-like editor or split preview.
+- Allow existing posts to be opened and edited from the admin page while preserving their slug, category, tags, and metadata unless intentionally changed.
+- Allow a new category to be created directly beside the category selector while writing, without leaving the editor.
+- Provide a rendered preview before publishing.
 - Autosave drafts and recover the latest unsaved or saved version after an interruption.
 - Keep revision history and allow the author to restore an earlier version.
 - Support draft, published, unpublished, scheduled, and deleted states, with a confirmation step before destructive deletion.
@@ -41,7 +45,16 @@ DB: SQLite. This blog is used and read by one person, so a lightweight setup is 
 - Provide a publish/build status so the author can tell whether a newly published post is deployed.
 - Keep the public site privacy-conscious; do not add tracking or analytics without an explicit decision.
 
-The current repository contains only the Astro reading experience with local sample data. The `/blog/` archive, Strapi CMS, protected admin area, category management, authenticated content workflow, and the supporting authoring/operations features above are planned next steps; they are not implemented yet.
+### Current frontend implementation
+
+- `/blog/` provides a multi-post archive with category filtering, tag filtering, search, empty states, and responsive cards.
+- `/blog/[slug]` provides post details, related posts, and an edit link into the writing page.
+- `/admin/` provides a frontend writing prototype with new-post creation, existing-post editing through `?edit=slug`, Markdown input, live rendered preview, excerpt/slug/category fields, local draft saving/restoration, and inline category creation.
+- The current prototype stores drafts and newly created categories in browser `localStorage`; it does not publish to a server.
+
+### Remaining backend work
+
+Strapi CMS integration, durable content and category CRUD, authentication, server-side authorization, protected draft previews, real publishing, media storage, and production backups are not implemented yet. The public build must not be treated as secure until those boundaries are enforced on the server.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the development and deployment architecture.
 

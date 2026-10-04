@@ -41,13 +41,19 @@ The first version should use one OCI VM and Docker Compose. This keeps the deplo
 The blog has two distinct areas:
 
 - **Public reading area**: the `/blog/` archive, published post detail pages, category navigation, tags, and search. It must not expose drafts or write APIs.
-- **Admin area**: a protected page where the owner can create and edit posts, create/edit/delete categories and tags, assign categories, save drafts, preview, publish, schedule, unpublish, restore revisions, and delete content.
+- **Admin area**: a protected page where the owner can create and edit posts, create/edit/delete categories and tags, add a category directly from the writing form, assign categories, save drafts, preview, publish, schedule, unpublish, restore revisions, and delete content.
 
 The `/blog/` archive is the single public space for browsing posts. It should include a distinctive category selector with a clear active state, useful empty states, and a layout that supports scanning many posts. Category changes should filter the archive in place or through a query parameter; do not create a separate `/categories/` route.
 
-The first authoring editor should use Markdown as the canonical body format. This keeps exports, revisions, backups, and future migrations portable. A richer editor can be added later without changing the public content contract.
+The first authoring editor should use Markdown as the canonical body format. While writing, the admin page must render the Markdown result in a Notion-like editor or split preview so headings, emphasis, links, lists, code, and quotes are visible before publishing. Existing posts must be editable from the admin page without losing their current metadata unless the author changes it. Keeping Markdown canonical makes exports, revisions, backups, and future migrations portable.
 
 The admin area is an authoring interface, not a second public-facing blog. Authentication identifies the owner, and authorization must be checked again by the CMS API for every read of private content and every mutation. A hidden URL is not an access control mechanism.
+
+### Current frontend milestone
+
+The Astro frontend currently implements the public `/blog/` archive, category/tag filtering, client-side search, post detail pages, related-post links, and a responsive `/admin/` writing prototype. The writing prototype supports new posts, editing seeded posts through `/admin/?edit=slug`, Markdown input with live rendered preview, local draft persistence, and inline local category creation. These are frontend-only behaviors backed by sample data and `localStorage`; they are not the authenticated CMS workflow.
+
+The next integration must replace local sample data and browser storage with server-backed Strapi operations, then enforce authentication and authorization before exposing the admin workflow in production.
 
 ## 3. Request and publishing flows
 
@@ -73,7 +79,7 @@ If webhook-driven builds are unavailable initially, a manual build/deploy comman
 
 Start with a deliberately small model:
 
-- `Post`: title, slug, excerpt, body, cover image (optional), category, tags, status, published date, updated date.
+- `Post`: title, slug, excerpt, Markdown body, cover image (optional), category, tags, status, published date, updated date.
 - `Category`: name, slug, description (optional), display order (optional), visual accent (optional).
 - `Tag`: name, slug.
 - `Media`: original file, optimized variants, alt text, dimensions, and storage key.

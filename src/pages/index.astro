@@ -22,16 +22,16 @@ const archivePosts = posts.slice(1);
 
 	<section id="notes" class="notes shell">
 		<div class="section-heading"><div><p class="eyebrow"><span>02</span> transmission log</p><h2>최근 기록</h2></div><p class="section-caption">{posts.length.toString().padStart(2, '0')} transmissions<br />and counting</p></div>
-		<a class={`featured-card ${featuredPost.accent}`} href={`/notes/${featuredPost.slug}`}>
+		<a class={`featured-card ${featuredPost.accent}`} href={`/blog/${featuredPost.slug}`}>
 			<div class="featured-meta"><span>featured signal</span><span>{featuredPost.date}</span></div>
 			<div class="featured-body"><div><h3>{featuredPost.title}</h3><p>{featuredPost.excerpt}</p></div><span class="arrow">↗</span></div>
 			<div class="tag-row">{featuredPost.tags.map((tag) => <span>#{tag}</span>)}</div>
 		</a>
 		<div class="content-grid">
 			<div class="archive-list">{archivePosts.map((post, index) => (
-				<a class="archive-item" href={`/notes/${post.slug}`}><span class="archive-index">0{index + 2}</span><div class="archive-main"><h3>{post.title}</h3><p>{post.excerpt}</p><span class="tag-row">{post.tags.map((tag) => <span>#{tag}</span>)}</span></div><span class="archive-date">{post.date}<br /><small>{post.readTime}</small></span></a>
+				<a class="archive-item" href={`/blog/${post.slug}`}><span class="archive-index">0{index + 2}</span><div class="archive-main"><h3>{post.title}</h3><p>{post.excerpt}</p><span class="tag-row">{post.tags.map((tag) => <span>#{tag}</span>)}</span></div><span class="archive-date">{post.date}<br /><small>{post.readTime}</small></span></a>
 			))}</div>
-			<aside id="about" class="about-panel"><p class="eyebrow"><span>03</span> about this orbit</p><p class="about-copy">나만 읽는 메모에서 시작한 작은 관측소입니다. 빠르게 지나가는 것들 사이에서 오래 남길 문장을 수집합니다.</p><div class="tag-cloud"><span class="label">frequent coordinates</span>{allTags.map((tag) => <a href={`/?tag=${tag}`}>#{tag}</a>)}</div></aside>
+			<aside id="about" class="about-panel"><p class="eyebrow"><span>03</span> about this orbit</p><p class="about-copy">나만 읽는 메모에서 시작한 작은 관측소입니다. 빠르게 지나가는 것들 사이에서 오래 남길 문장을 수집합니다.</p><div class="tag-cloud"><span class="label">frequent coordinates</span>{allTags.map((tag) => <a href={`/blog/?tag=${encodeURIComponent(tag)}`}>#{tag}</a>)}</div></aside>
 		</div>
 	</section>
 </BaseLayout>

@@ -1,0 +1,146 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { categories, posts } from '../../data/posts';
+
+const seedPosts = posts.map((post) => ({
+	slug: post.slug,
+	title: post.title,
+	excerpt: post.excerpt,
+	category: post.category,
+	date: post.date,
+	content: post.content.join('\n\n'),
+}));
+const editSlug = Astro.url.searchParams.get('edit');
+---
+
+<BaseLayout title="ADMIN / WRITE / ORBITAL NOTES" description="Orbital Notes 글 작성 공간.">
+	<section class="admin-hero shell">
+		<div>
+			<p class="eyebrow"><span>04</span> authoring console</p>
+			<h1>다음 기록을<br /><em>궤도에 올립니다.</em></h1>
+		</div>
+		<div class="draft-status" id="draft-status"><span class="status-dot"></span>local draft ready</div>
+	</section>
+
+	<section class="editor-shell shell" aria-label="글 작성 편집기">
+		<form class="editor-form" id="editor-form">
+			<div class="editor-toolbar">
+				<div><span class="field-label">EDITING SIGNAL</span></div>
+				<div class="toolbar-actions"><button class="button secondary" id="save-draft" type="button">임시저장</button><button class="button primary" id="publish-preview" type="button">미리보기</button></div>
+			</div>
+
+			<div class="metadata-grid">
+				<label class="field field-title"><span class="field-label">TITLE</span><input id="title" name="title" type="text" placeholder="기록의 제목을 입력하세요" required /></label>
+				<div class="field category-field"><span class="field-label">CATEGORY</span><div class="category-control"><select id="category" name="category" required>{categories.map((category) => <option value={category.slug}>{category.name}</option>)}</select><button class="add-category" id="show-category-form" type="button" aria-label="카테고리 추가">+ add</button></div><div class="category-form" id="category-form" hidden><input id="new-category" type="text" placeholder="새 카테고리 이름" /><button class="add-category confirm" id="add-category" type="button">추가</button></div></div>
+				<label class="field"><span class="field-label">SLUG</span><input id="slug" name="slug" type="text" placeholder="post-slug" required /></label>
+				<label class="field field-excerpt"><span class="field-label">EXCERPT</span><input id="excerpt" name="excerpt" type="text" placeholder="목록에 표시될 짧은 설명" /></label>
+			</div>
+
+			<div class="writing-grid">
+				<label class="markdown-pane"><span class="pane-heading"><span>MARKDOWN</span><small>write freely</small></span><textarea id="content" name="content" spellcheck="false" placeholder="# 오늘의 기록\n\n생각을 Markdown으로 작성해보세요.\n\n- 목록\n- **강조**\n- `코드`"></textarea></label>
+				<section class="preview-pane" aria-label="Markdown 미리보기"><div class="pane-heading"><span>RENDERED PREVIEW</span><small>live signal</small></div><article class="markdown-preview" id="preview"></article></section>
+			</div>
+		</form>
+	</section>
+
+	<script type="application/json" id="seed-posts" set:html={JSON.stringify(seedPosts)}></script>
+	<div id="editor-config" data-edit-slug={editSlug ?? ''}></div>
+</BaseLayout>
+
+<script>
+	import { marked } from 'marked';
+
+	const seedPosts = JSON.parse(document.querySelector('#seed-posts')?.textContent || '[]');
+	const draftKey = 'orbital-notes-drafts';
+	const form = document.querySelector('#editor-form');
+	const editSlug = document.querySelector('#editor-config')?.dataset.editSlug || '';
+	const title = document.querySelector('#title');
+	const category = document.querySelector('#category');
+	const slug = document.querySelector('#slug');
+	const excerpt = document.querySelector('#excerpt');
+	const content = document.querySelector('#content');
+	const preview = document.querySelector('#preview');
+	const status = document.querySelector('#draft-status');
+	const saveDraft = document.querySelector('#save-draft');
+	const publishPreview = document.querySelector('#publish-preview');
+	const categoryForm = document.querySelector('#category-form');
+	const showCategoryForm = document.querySelector('#show-category-form');
+	const newCategory = document.querySelector('#new-category');
+	const addCategory = document.querySelector('#add-category');
+
+	const getDrafts = () => JSON.parse(localStorage.getItem(draftKey) || '{}');
+	const categoryKey = 'orbital-notes-categories';
+	const getLocalCategories = () => JSON.parse(localStorage.getItem(categoryKey) || '[]');
+	const setStatus = (message, active = false) => {
+		if (status) status.innerHTML = `<span class="status-dot${active ? ' active' : ''}"></span>${message}`;
+	};
+	const currentPost = () => ({ slug: slug.value.trim(), title: title.value.trim(), excerpt: excerpt.value.trim(), category: category.value, content: content.value });
+	const findPost = (postSlug) => seedPosts.find((post) => post.slug === postSlug);
+
+	function renderPreview() {
+		if (preview) preview.innerHTML = marked.parse(content.value || '*작성 중인 Markdown이 여기에 나타납니다.*');
+	}
+
+	function loadPost(postSlug) {
+		const source = postSlug === 'new' ? { slug: '', title: '', excerpt: '', category: category.options[0]?.value || '', content: '' } : findPost(postSlug);
+		const saved = postSlug === 'new' ? null : getDrafts()[postSlug];
+		const next = saved || source;
+		if (!next) return;
+		title.value = next.title || '';
+		excerpt.value = next.excerpt || '';
+		category.value = next.category || category.options[0]?.value || '';
+		slug.value = next.slug || '';
+		content.value = next.content || '';
+		renderPreview();
+		setStatus(saved ? 'local draft restored' : 'local draft ready', Boolean(saved));
+	}
+
+	function persistDraft() {
+		const post = currentPost();
+		const key = post.slug || 'new';
+		const drafts = getDrafts();
+		drafts[key] = post;
+		localStorage.setItem(draftKey, JSON.stringify(drafts));
+		setStatus(`saved locally / ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`, true);
+	}
+
+	function addLocalCategory() {
+		const name = newCategory?.value.trim();
+		if (!name) return;
+		const nextCategory = { name, slug: `local-${Date.now()}` };
+		const localCategories = [...getLocalCategories(), nextCategory];
+		localStorage.setItem(categoryKey, JSON.stringify(localCategories));
+		const option = new Option(nextCategory.name, nextCategory.slug, true, true);
+		category.add(option);
+		newCategory.value = '';
+		categoryForm.hidden = true;
+		setStatus(`category added / ${name}`, true);
+	}
+
+	getLocalCategories().forEach((localCategory) => category.add(new Option(localCategory.name, localCategory.slug)));
+
+	[title, category, slug, excerpt, content].forEach((field) => field?.addEventListener('input', renderPreview));
+	content?.addEventListener('input', () => setStatus('unsaved changes', true));
+	showCategoryForm?.addEventListener('click', () => {
+		categoryForm.hidden = !categoryForm.hidden;
+		if (!categoryForm.hidden) newCategory?.focus();
+	});
+	addCategory?.addEventListener('click', addLocalCategory);
+	newCategory?.addEventListener('keydown', (event) => {
+		if (event.key === 'Enter') addLocalCategory();
+	});
+	saveDraft?.addEventListener('click', persistDraft);
+	publishPreview?.addEventListener('click', () => {
+		persistDraft();
+		setStatus('preview is ready / publish later', true);
+		preview?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	});
+	form?.addEventListener('submit', (event) => event.preventDefault());
+	loadPost(editSlug || 'new');
+</script>
+
+<style>
+	.admin-hero { display:flex; justify-content:space-between; align-items:end; gap:30px; padding:82px 0 62px; }.eyebrow { margin:0 0 22px; color:var(--muted); font:.65rem 'DM Mono',monospace; letter-spacing:.1em; text-transform:uppercase; }.eyebrow span { margin-right:13px; color:var(--cyan); }.admin-hero h1 { margin:0; font-size:clamp(2.7rem,6vw,5.4rem); line-height:.96; letter-spacing:-.07em; font-weight:500; }.admin-hero h1 em { color:var(--violet); font-style:normal; }.draft-status { display:flex; align-items:center; gap:8px; color:var(--muted); font:.62rem 'DM Mono',monospace; text-transform:uppercase; letter-spacing:.08em; }.status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--faint); }.status-dot.active { background:var(--cyan); box-shadow:0 0 12px var(--cyan); }.editor-shell { padding-bottom:100px; }.editor-form { border:1px solid var(--line); background:rgba(13,17,36,.7); }.editor-toolbar { display:flex; justify-content:space-between; align-items:end; gap:20px; padding:22px 25px; border-bottom:1px solid var(--line); }.select-field { display:flex; flex-direction:column; gap:9px; }.field-label { color:var(--faint); font:.58rem 'DM Mono',monospace; letter-spacing:.1em; }.select-field select,.field input,.field select { min-width:220px; padding:0; color:var(--ink); border:0; outline:0; background:transparent; font:.85rem 'Space Grotesk',sans-serif; }.select-field select option,.field select option { color:#101326; }.toolbar-actions { display:flex; gap:9px; }.button { padding:10px 15px; border:1px solid var(--line); border-radius:2px; color:var(--ink); font:.65rem 'DM Mono',monospace; cursor:pointer; }.button.secondary { background:transparent; }.button.primary { border-color:var(--cyan); background:rgba(98,220,232,.1); }.button:hover { transform:translateY(-1px); }.metadata-grid { display:grid; grid-template-columns:1.5fr .7fr 1fr; gap:22px; padding:28px 25px; border-bottom:1px solid var(--line); }.field { display:flex; flex-direction:column; gap:10px; min-width:0; }.field input,.field select { width:100%; padding-bottom:9px; border-bottom:1px solid var(--line); }.field input:focus,.field select:focus { border-color:var(--cyan); }.field-title { grid-column:span 2; }.field-title input { font-size:1.35rem; }.field-excerpt { grid-column:span 3; }.writing-grid { display:grid; grid-template-columns:1fr 1fr; min-height:560px; }.markdown-pane,.preview-pane { min-width:0; }.markdown-pane { border-right:1px solid var(--line); }.pane-heading { display:flex; justify-content:space-between; padding:16px 20px; color:var(--muted); border-bottom:1px solid var(--line); font:.6rem 'DM Mono',monospace; letter-spacing:.08em; }.pane-heading small { color:var(--faint); text-transform:lowercase; }.markdown-pane textarea { display:block; width:100%; height:500px; padding:25px 24px; resize:vertical; color:#cbd4ec; border:0; outline:0; background:transparent; font:1rem/1.85 'DM Mono',monospace; }.markdown-pane textarea::placeholder { color:var(--faint); }.markdown-preview { min-height:500px; padding:25px 30px; color:#cbd4ec; }.markdown-preview h1,.markdown-preview h2,.markdown-preview h3 { color:var(--ink); line-height:1.2; letter-spacing:-.04em; }.markdown-preview h1 { font-size:2rem; }.markdown-preview h2 { font-size:1.5rem; }.markdown-preview p,.markdown-preview ul,.markdown-preview ol { line-height:1.85; }.markdown-preview blockquote { margin:22px 0; padding-left:18px; color:var(--muted); border-left:2px solid var(--violet); }.markdown-preview code { padding:3px 5px; color:var(--cyan); background:rgba(98,220,232,.08); font:.85em 'DM Mono',monospace; }.markdown-preview pre { overflow:auto; padding:16px; background:#080a16; }.markdown-preview pre code { padding:0; }.markdown-preview a { color:var(--cyan); text-decoration:underline; text-underline-offset:3px; }.markdown-preview hr { border:0; border-top:1px solid var(--line); }.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+	.category-control { display:flex; align-items:end; gap:9px; }.category-control select { flex:1; min-width:0; }.add-category { padding:7px 9px; color:var(--cyan); border:1px solid var(--line); background:transparent; font:.58rem 'DM Mono',monospace; cursor:pointer; }.add-category:hover { border-color:var(--cyan); }.category-form { display:flex; gap:7px; margin-top:9px; }.category-form[hidden] { display:none; }.category-form input { min-width:0; flex:1; padding:7px 8px; color:var(--ink); border:1px solid var(--line); outline:0; background:transparent; font:.7rem 'Space Grotesk',sans-serif; }.category-form input:focus { border-color:var(--cyan); }.add-category.confirm { color:var(--ink); border-color:var(--cyan); }
+	@media(max-width:700px) { .admin-hero { align-items:start; flex-direction:column; padding:62px 0 45px; }.draft-status { align-self:end; }.editor-toolbar { align-items:start; flex-direction:column; }.toolbar-actions { width:100%; }.button { flex:1; }.metadata-grid { grid-template-columns:1fr; }.field-title,.field-excerpt { grid-column:auto; }.writing-grid { grid-template-columns:1fr; }.markdown-pane { border-right:0; border-bottom:1px solid var(--line); }.markdown-pane textarea,.markdown-preview { min-height:360px; height:360px; } }
+</style>
