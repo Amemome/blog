@@ -16,7 +16,7 @@
 Reader -> Astro static site -> Strapi REST API (published content only)
               ^                         ^
               |                         |
-       CI build/deploy            Admin UI + API auth
+      CI build/deploy        Protected admin UI + API auth
                                         |
                                   SQLite volume
                                         |
@@ -27,7 +27,7 @@ Reader -> Astro static site -> Strapi REST API (published content only)
 
 | Component | Responsibility | Initial deployment |
 | --- | --- | --- |
-| Astro | Renders posts, tags, search UI, and static pages | Static output behind Caddy/Nginx |
+| Astro | Renders posts, categories, tags, search UI, and static pages | Static output behind Caddy/Nginx |
 | Strapi | Admin UI, draft/publish workflow, content API | Private OCI VM/container |
 | SQLite | Strapi database and source of truth | Persistent OCI block volume |
 | Caddy or Nginx | TLS termination and reverse proxy | Same OCI VM |
@@ -35,6 +35,19 @@ Reader -> Astro static site -> Strapi REST API (published content only)
 | OCI Object Storage | Off-host backups of SQLite and media | Scheduled backup target |
 
 The first version should use one OCI VM and Docker Compose. This keeps the deployment understandable and avoids introducing Kubernetes or a second database before the workload needs it.
+
+## 2.1 Product scope
+
+The blog has two distinct areas:
+
+- **Public reading area**: the `/blog/` archive, published post detail pages, category navigation, tags, and search. It must not expose drafts or write APIs.
+- **Admin area**: a protected page where the owner can create and edit posts, create/edit/delete categories and tags, assign categories, save drafts, preview, publish, schedule, unpublish, restore revisions, and delete content.
+
+The `/blog/` archive is the single public space for browsing posts. It should include a distinctive category selector with a clear active state, useful empty states, and a layout that supports scanning many posts. Category changes should filter the archive in place or through a query parameter; do not create a separate `/categories/` route.
+
+The first authoring editor should use Markdown as the canonical body format. This keeps exports, revisions, backups, and future migrations portable. A richer editor can be added later without changing the public content contract.
+
+The admin area is an authoring interface, not a second public-facing blog. Authentication identifies the owner, and authorization must be checked again by the CMS API for every read of private content and every mutation. A hidden URL is not an access control mechanism.
 
 ## 3. Request and publishing flows
 
@@ -47,11 +60,12 @@ The first version should use one OCI VM and Docker Compose. This keeps the deplo
 
 ### Publishing a post
 
-1. The author signs in to Strapi over an admin-only HTTPS endpoint.
-2. The author saves a draft and publishes it.
-3. Strapi sends a signed webhook to CI/CD.
-4. CI/CD runs the Astro build against the Strapi API and deploys the generated output.
-5. The old static site remains available until the new deployment is healthy.
+1. The author opens the protected admin page and authenticates.
+2. The author creates or edits a post, selects a category, optionally adds tags, and saves a draft.
+3. The author publishes the draft after reviewing it, or unpublishes it to remove it from the public site.
+4. Strapi sends a signed webhook to CI/CD after a publish-state change.
+5. CI/CD runs the Astro build against the Strapi API and deploys the generated output.
+6. The old static site remains available until the new deployment is healthy.
 
 If webhook-driven builds are unavailable initially, a manual build/deploy command is an acceptable first milestone. The public site must not query draft content at runtime.
 
@@ -59,21 +73,42 @@ If webhook-driven builds are unavailable initially, a manual build/deploy comman
 
 Start with a deliberately small model:
 
-- `Post`: title, slug, excerpt, body, cover image (optional), status, published date, updated date.
+- `Post`: title, slug, excerpt, body, cover image (optional), category, tags, status, published date, updated date.
+- `Category`: name, slug, description (optional), display order (optional), visual accent (optional).
 - `Tag`: name, slug.
+- `Media`: original file, optimized variants, alt text, dimensions, and storage key.
+- `PostRevision`: post reference, Markdown body, metadata snapshot, author, and created date.
+- `Post` to `Category`: many-to-one relation; every published post must have one primary category.
 - `Post` to `Tag`: many-to-many relation.
+- `Post` to `PostRevision`: one-to-many relation for recovery and restore.
 
-Strapi's draft/publish feature controls visibility. Astro should validate the response shape at the API boundary and render an explicit not-found page when a slug is missing or unpublished.
+Strapi's draft/publish feature controls visibility. Astro should validate the response shape at the API boundary and render an explicit not-found page when a slug is missing or unpublished. The `/blog/` archive should display published posts only and handle an unknown category filter without exposing private content.
+
+The planned routes are:
+
+- `/`: landing page and recent highlights.
+- `/blog/`: multi-post archive with the category selector and filtering.
+- `/blog/[slug]`: published post detail reached from the archive.
+- `/rss.xml`: published-post RSS feed.
+- `/sitemap-index.xml`: sitemap for public pages.
+- `/admin`: authenticated authoring UI; never included in the public static build.
+- `/admin/preview/[id]`: authenticated draft preview, never exposed to public readers or the static build.
 
 ## 5. Security boundaries
 
-- Keep Strapi Admin and the Strapi API private behind HTTPS, an allowlist, VPN, or an additional access layer.
+- Keep the admin UI, Strapi Admin, and private Strapi API behind HTTPS, an allowlist, VPN, or an additional access layer.
+- Require strong authentication for the admin area and use secure, HttpOnly, SameSite session cookies or an equivalent server-managed session.
+- Enforce authorization on the server for post creation, editing, deletion, draft access, category/tag creation, editing and deletion, and publish/unpublish operations.
+- Require authorization for previews, media uploads, revision access, scheduled publishing, exports, and backup/restore operations.
+- Use a single-owner role initially; do not assume that frontend route protection is sufficient authorization.
 - Expose only the minimum read permissions required for published posts.
-- Do not put Strapi admin tokens, webhook secrets, or OCI credentials in Astro client code.
+- Do not put Strapi admin tokens, session secrets, webhook secrets, or OCI credentials in Astro client code.
 - Store secrets in CI/CD secrets and the server's protected environment, never in Git.
 - Use separate read-only build credentials if the API cannot be public.
 - Restrict the VM firewall to SSH from a trusted source and HTTPS from the internet.
 - Disable public access to SQLite and uploaded media directories.
+- Add CSRF protection to state-changing admin requests when cookie-based sessions are used, and rate-limit authentication endpoints.
+- Record authentication and publishing activity without storing unnecessary personal data.
 
 The frontend should be treated as public even if the content is personally written. If the entire blog must be private, add authentication at the reverse proxy or identity layer; do not rely on hiding Strapi endpoints.
 
@@ -87,6 +122,8 @@ SQLite is a good fit for the initial single-node workload, but it requires opera
 - Retain daily backups for 14 days and a weekly backup for 8 weeks.
 - Periodically restore a backup into a disposable Strapi instance.
 - Record the Strapi version, Node version, schema changes, and restore steps.
+- Export posts, categories, tags, and metadata as JSON for a provider-independent recovery path.
+- Include uploaded media in backup coverage and verify that optimized variants can be regenerated.
 
 SQLite should remain single-writer and single-node. Move to PostgreSQL only when concurrent writes, multiple application instances, or operational limits make that tradeoff worthwhile.
 
@@ -131,16 +168,22 @@ Keep Strapi-generated files inside `apps/cms`. The Astro app should consume a sm
 ## 9. Delivery milestones
 
 1. Create `apps/web` and `apps/cms` with pinned Node and package-manager versions.
-2. Define the Post and Tag content types and verify draft/publish behavior.
-3. Build the Astro content client, post list, post detail, and 404 page.
-4. Add local Compose wiring and environment variable validation.
-5. Add CI build checks and a manual static deployment.
-6. Add the publish webhook, OCI reverse proxy, HTTPS, and firewall rules.
-7. Add scheduled encrypted backups and perform a restore drill.
+2. Define the Post, Category, and Tag content types and verify draft/publish behavior.
+3. Build the Astro content client, `/blog/` multi-post archive, `/blog/[slug]` detail page, distinctive category selector, and 404 page.
+4. Build the protected admin page and authoring workflow for post create, edit, draft, publish, unpublish, and delete.
+5. Add category and tag CRUD to the protected admin workflow.
+6. Add Markdown preview, autosave, revision restore, scheduling, reading-time calculation, and media management.
+7. Add authentication, server-side authorization, CSRF protection, rate limiting, and activity logging for the admin workflow.
+8. Add search, related posts, RSS, sitemap, SEO metadata, accessibility states, and responsive behavior.
+9. Add local Compose wiring and environment variable validation.
+10. Add CI build checks, publish/build status, and a manual static deployment.
+11. Add the publish webhook, OCI reverse proxy, HTTPS, and firewall rules.
+12. Add scheduled encrypted backups, JSON export, media backup, and perform a restore drill.
 
 ## 10. Decisions to revisit
 
-- Whether the public site needs authentication.
+- Whether the public site also needs authentication; the admin area requires authentication regardless.
+- Whether analytics are needed; default to no tracking until there is a clear use case.
 - Whether images should remain on the VM or move to OCI Object Storage.
 - Whether build-time publishing latency is acceptable; if not, consider Astro SSR.
 - Whether SQLite remains suitable before adding any second application instance.
