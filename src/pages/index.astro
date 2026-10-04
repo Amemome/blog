@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { allTags, posts } from '../data/posts';
+
+const featuredPost = posts[0];
+const archivePosts = posts.slice(1);
+---
+
+<BaseLayout>
+	<section class="hero shell">
+		<div class="hero-copy">
+			<p class="eyebrow"><span>01</span> personal observatory / online</p>
+			<h1>생각이 머무는<br /><em>작은 궤도.</em></h1>
+			<p class="hero-intro">매일의 관측과 개발 중인 생각을<br />조용히 기록합니다.</p>
+			<a class="scroll-cue" href="#notes"><span class="scroll-line"></span> explore the log</a>
+		</div>
+		<div class="orbit-visual" aria-label="궤도를 도는 작은 별의 시각화">
+			<div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="planet"><span>ON</span></div><div class="satellite"></div>
+			<span class="coordinate coordinate-one">37° 33' 58" N</span><span class="coordinate coordinate-two">127° 00' 12" E</span>
+		</div>
+	</section>
+
+	<section id="notes" class="notes shell">
+		<div class="section-heading"><div><p class="eyebrow"><span>02</span> transmission log</p><h2>최근 기록</h2></div><p class="section-caption">{posts.length.toString().padStart(2, '0')} transmissions<br />and counting</p></div>
+		<a class={`featured-card ${featuredPost.accent}`} href={`/notes/${featuredPost.slug}`}>
+			<div class="featured-meta"><span>featured signal</span><span>{featuredPost.date}</span></div>
+			<div class="featured-body"><div><h3>{featuredPost.title}</h3><p>{featuredPost.excerpt}</p></div><span class="arrow">↗</span></div>
+			<div class="tag-row">{featuredPost.tags.map((tag) => <span>#{tag}</span>)}</div>
+		</a>
+		<div class="content-grid">
+			<div class="archive-list">{archivePosts.map((post, index) => (
+				<a class="archive-item" href={`/notes/${post.slug}`}><span class="archive-index">0{index + 2}</span><div class="archive-main"><h3>{post.title}</h3><p>{post.excerpt}</p><span class="tag-row">{post.tags.map((tag) => <span>#{tag}</span>)}</span></div><span class="archive-date">{post.date}<br /><small>{post.readTime}</small></span></a>
+			))}</div>
+			<aside id="about" class="about-panel"><p class="eyebrow"><span>03</span> about this orbit</p><p class="about-copy">나만 읽는 메모에서 시작한 작은 관측소입니다. 빠르게 지나가는 것들 사이에서 오래 남길 문장을 수집합니다.</p><div class="tag-cloud"><span class="label">frequent coordinates</span>{allTags.map((tag) => <a href={`/?tag=${tag}`}>#{tag}</a>)}</div></aside>
+		</div>
+	</section>
+</BaseLayout>
+
+<style>
+	.hero { position:relative; min-height:570px; display:grid; grid-template-columns:.92fr 1.08fr; align-items:center; gap:36px; }.hero-copy { position:relative; z-index:1; padding:60px 0 80px; }.eyebrow { margin:0 0 22px; color:var(--muted); font:.65rem 'DM Mono',monospace; letter-spacing:.1em; text-transform:uppercase; }.eyebrow span { margin-right:13px; color:var(--cyan); } h1 { max-width:570px; margin:0; font-size:clamp(3.2rem,7vw,6.8rem); line-height:.94; letter-spacing:-.07em; font-weight:500; } h1 em { color:var(--violet); font-style:normal; }.hero-intro { margin:30px 0 38px; color:var(--muted); font-size:1rem; line-height:1.75; }.scroll-cue { display:inline-flex; align-items:center; gap:12px; color:var(--ink); font:.65rem 'DM Mono',monospace; text-transform:uppercase; letter-spacing:.08em; }.scroll-line { width:42px; height:1px; background:var(--cyan); }.orbit-visual { position:relative; aspect-ratio:1; max-width:520px; justify-self:end; width:100%; background:radial-gradient(circle at 50% 50%,rgba(57,48,119,.35),transparent 48%); }.orbit { position:absolute; inset:15%; border:1px solid rgba(167,155,255,.32); border-radius:50%; transform:rotate(-28deg) scaleY(.42); }.orbit-b { inset:24% 5%; transform:rotate(38deg) scaleY(.62); border-color:rgba(98,220,232,.26); }.planet { position:absolute; top:50%; left:50%; display:grid; place-items:center; width:128px; height:128px; transform:translate(-50%,-50%); border:1px solid rgba(221,216,255,.72); border-radius:50%; background:radial-gradient(circle at 35% 28%,#7d77c1,#322d71 47%,#16142f 75%); box-shadow:0 0 50px rgba(104,93,232,.35),inset -22px -18px 30px rgba(0,0,0,.5); }.planet::before { content:''; position:absolute; width:188px; height:45px; border:1px solid rgba(98,220,232,.7); border-radius:50%; transform:rotate(-23deg); }.planet span { color:#e8e5ff; font:.6rem 'DM Mono',monospace; letter-spacing:.15em; }.satellite { position:absolute; top:28%; right:19%; width:9px; height:9px; border-radius:50%; background:var(--amber); box-shadow:0 0 17px var(--amber); }.coordinate { position:absolute; color:var(--faint); font:.57rem 'DM Mono',monospace; letter-spacing:.1em; }.coordinate-one { top:18%; left:3%; }.coordinate-two { right:2%; bottom:19%; }
+	.notes { padding-top:88px; }.section-heading { display:flex; justify-content:space-between; align-items:end; margin-bottom:28px; } h2 { margin:0; font-size:2rem; font-weight:500; letter-spacing:-.05em; }.section-caption { margin:0; color:var(--faint); font:.65rem 'DM Mono',monospace; line-height:1.7; text-align:right; text-transform:uppercase; }.featured-card { display:block; padding:28px 30px 25px; border:1px solid var(--line); background:linear-gradient(105deg,rgba(45,37,92,.72),rgba(19,23,48,.84)); transition:border-color .25s,transform .25s; }.featured-card:hover { border-color:rgba(167,155,255,.7); transform:translateY(-3px); }.featured-card.cyan { background:linear-gradient(105deg,rgba(20,66,82,.7),rgba(19,23,48,.84)); }.featured-meta,.archive-date { color:var(--muted); font:.62rem 'DM Mono',monospace; text-transform:uppercase; letter-spacing:.08em; }.featured-meta { display:flex; justify-content:space-between; }.featured-body { display:flex; justify-content:space-between; align-items:end; gap:18px; padding:58px 0 44px; }.featured-body h3 { max-width:650px; margin:0 0 12px; font-size:clamp(1.6rem,3vw,2.7rem); letter-spacing:-.055em; font-weight:500; }.featured-body p { max-width:560px; margin:0; color:#aeb8d4; line-height:1.7; }.arrow { color:var(--cyan); font-size:2rem; }.tag-row { display:flex; gap:10px; color:var(--faint); font:.62rem 'DM Mono',monospace; }.content-grid { display:grid; grid-template-columns:1.65fr .8fr; gap:74px; padding-top:48px; }.archive-item { display:grid; grid-template-columns:42px 1fr 95px; gap:18px; align-items:start; padding:24px 0; border-top:1px solid var(--line); }.archive-item:hover h3 { color:var(--violet); }.archive-index { color:var(--cyan); font:.63rem 'DM Mono',monospace; }.archive-main h3 { margin:0 0 7px; font-size:1.05rem; font-weight:500; }.archive-main p { margin:0 0 14px; color:var(--muted); font-size:.85rem; line-height:1.55; }.archive-date { text-align:right; line-height:1.7; }.archive-date small { color:var(--faint); text-transform:none; }.about-panel { align-self:start; padding:25px 0 0 28px; border-left:1px solid var(--line); }.about-copy { margin:0 0 42px; color:#aeb8d4; font-size:.9rem; line-height:1.8; }.tag-cloud { display:flex; flex-wrap:wrap; gap:9px; }.tag-cloud .label { flex-basis:100%; margin-bottom:5px; color:var(--faint); font:.6rem 'DM Mono',monospace; text-transform:uppercase; letter-spacing:.08em; }.tag-cloud a { padding:7px 9px; color:var(--muted); border:1px solid var(--line); font:.65rem 'DM Mono',monospace; }.tag-cloud a:hover { color:var(--ink); border-color:var(--cyan); }
+	@media(max-width:760px) { .hero { min-height:auto; grid-template-columns:1fr; padding-top:35px; }.hero-copy { padding:45px 0 10px; }.orbit-visual { max-width:420px; justify-self:center; margin:0 auto 30px; }.content-grid { grid-template-columns:1fr; gap:25px; }.about-panel { padding:28px 0 0; border-top:1px solid var(--line); border-left:0; }.featured-body { padding:42px 0 35px; } } @media(max-width:500px) { .featured-card { padding:22px 20px; }.archive-item { grid-template-columns:28px 1fr; }.archive-date { grid-column:2; text-align:left; }.section-heading { align-items:start; }.section-caption { display:none; } }
+</style>

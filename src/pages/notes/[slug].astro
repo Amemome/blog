@@ -1,0 +1,19 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { posts } from '../../data/posts';
+export function getStaticPaths() { return posts.map((post) => ({ params: { slug: post.slug }, props: { post } })); }
+const { post } = Astro.props;
+---
+<BaseLayout title={`${post.title} / ORBITAL NOTES`} description={post.excerpt}>
+	<article class="post shell">
+		<a class="back-link" href="/"><span>←</span> return to orbit</a>
+		<header class="post-header"><p class="eyebrow"><span>TRANSMISSION</span> {post.date} / {post.readTime}</p><h1>{post.title}</h1><p class="post-excerpt">{post.excerpt}</p><div class="tag-row">{post.tags.map((tag) => <span>#{tag}</span>)}</div></header>
+		<div class="post-rule"><span></span><span>✦</span><span></span></div>
+		<div class="post-content">{post.content.map((paragraph) => <p>{paragraph}</p>)}</div>
+		<footer class="post-footer"><span>END OF TRANSMISSION</span><a href="/#notes">read another note ↗</a></footer>
+	</article>
+</BaseLayout>
+<style>
+	.post { padding:72px 0 100px; }.back-link { color:var(--muted); font:.65rem 'DM Mono',monospace; text-transform:uppercase; letter-spacing:.07em; }.back-link span { margin-right:8px; color:var(--cyan); }.back-link:hover { color:var(--ink); }.post-header { max-width:760px; padding:105px 0 65px; }.eyebrow { margin:0 0 22px; color:var(--muted); font:.65rem 'DM Mono',monospace; letter-spacing:.1em; text-transform:uppercase; }.eyebrow span { margin-right:13px; color:var(--violet); }.post h1 { margin:0 0 25px; font-size:clamp(2.7rem,6vw,5.6rem); line-height:1; letter-spacing:-.07em; font-weight:500; }.post-excerpt { max-width:600px; margin:0 0 27px; color:var(--muted); font-size:1.05rem; line-height:1.75; }.tag-row { display:flex; gap:10px; color:var(--faint); font:.62rem 'DM Mono',monospace; }.post-rule { display:flex; align-items:center; gap:15px; color:var(--cyan); font-size:.85rem; }.post-rule span:first-child,.post-rule span:last-child { height:1px; flex:1; background:var(--line); }.post-content { max-width:660px; margin:68px auto 0; }.post-content p { margin:0 0 30px; color:#c0c9e1; font-size:1.12rem; line-height:2; }.post-footer { display:flex; justify-content:space-between; margin-top:80px; padding-top:22px; border-top:1px solid var(--line); color:var(--faint); font:.62rem 'DM Mono',monospace; letter-spacing:.08em; text-transform:uppercase; }.post-footer a { color:var(--cyan); }.post-footer a:hover { color:var(--ink); }
+	@media(max-width:600px) { .post { padding-top:45px; }.post-header { padding:80px 0 50px; }.post-content { margin-top:50px; }.post-content p { font-size:1rem; }.post-footer { gap:20px; flex-direction:column; } }
+</style>
