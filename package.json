@@ -12,10 +12,17 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/node": "^11.1.6",
     "astro": "^7.3.5",
-    "marked": "^18.0.14"
+    "better-sqlite3": "^13.0.3",
+    "dompurify": "^3.4.16",
+    "marked": "^18.0.14",
+    "sanitize-html": "^2.18.0"
   },
   "allowScripts": {
     "esbuild": true
+  },
+  "devDependencies": {
+    "@types/dompurify": "^3.0.5"
   }
 }

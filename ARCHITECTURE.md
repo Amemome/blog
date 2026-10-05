@@ -49,11 +49,11 @@ The first authoring editor should use Markdown as the canonical body format. Whi
 
 The admin area is an authoring interface, not a second public-facing blog. Authentication identifies the owner, and authorization must be checked again by the CMS API for every read of private content and every mutation. A hidden URL is not an access control mechanism.
 
-### Current frontend milestone
+### Current implementation milestone
 
-The Astro frontend currently implements the public `/blog/` archive, category/tag filtering, client-side search, post detail pages, related-post links, and a responsive `/admin/` writing prototype. The writing prototype supports new posts, editing seeded posts through `/admin/?edit=slug`, Markdown input with live rendered preview, local draft persistence, and inline local category creation. These are frontend-only behaviors backed by sample data and `localStorage`; they are not the authenticated CMS workflow.
+The Astro server currently implements the public `/blog/` archive, category/tag filtering, client-side search, post detail pages, related-post links, and a server-authorized `/admin/` writing workflow. The editor supports Markdown preview, autosave, revision restore, publishing states, scheduling metadata, media upload, and inline category creation. SQLite is the local source of truth and all private mutations are protected by session and CSRF checks.
 
-The next integration must replace local sample data and browser storage with server-backed Strapi operations, then enforce authentication and authorization before exposing the admin workflow in production.
+Production integration still needs an external scheduler, encrypted off-host backup runner, HTTPS reverse proxy, and deployment webhook. The public site continues to query only published records.
 
 ## 3. Request and publishing flows
 

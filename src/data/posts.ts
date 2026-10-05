@@ -8,6 +8,9 @@ export type Post = {
 	category: string;
 	tags: string[];
 	accent: string;
+	coverUrl?: string | null;
+	socialTitle?: string | null;
+	socialDescription?: string | null;
 };
 
 export type Category = {

@@ -1,17 +1,14 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { getCategory, posts } from '../../data/posts';
+import { getCategoryBySlug, getPublishedPost, getPublishedPosts } from '../../lib/server/content';
 
-export function getStaticPaths() {
-	return posts.map((post) => ({ params: { slug: post.slug }, props: { post } }));
-}
-
-const { post } = Astro.props;
-const category = getCategory(post.category);
-const relatedPosts = posts.filter((candidate) => candidate.category === post.category && candidate.slug !== post.slug).slice(0, 2);
+const post = getPublishedPost(Astro.params.slug ?? '');
+if (!post) return new Response(null, { status: 404 });
+const category = getCategoryBySlug(post.category);
+const relatedPosts = getPublishedPosts().filter((candidate) => candidate.category === post.category && candidate.slug !== post.slug).slice(0, 2);
 ---
 
-<BaseLayout title={`${post.title} / ORBITAL NOTES`} description={post.excerpt}>
+<BaseLayout title={`${post.socialTitle ?? post.title} / ORBITAL NOTES`} description={post.socialDescription ?? post.excerpt} canonical={`/blog/${post.slug}`} image={post.coverUrl ?? undefined}>
 	<article class="post shell">
 		<a class="back-link" href="/blog/"><span>←</span> return to archive</a>
 		<header class="post-header">
@@ -21,7 +18,7 @@ const relatedPosts = posts.filter((candidate) => candidate.category === post.cat
 			<div class="tag-row">{post.tags.map((tag) => <span>#{tag}</span>)}</div>
 		</header>
 		<div class="post-rule"><span></span><span>✦</span><span></span></div>
-		<div class="post-content">{post.content.map((paragraph) => <p>{paragraph}</p>)}</div>
+		<div class="post-content">{post.content.map((paragraph) => <div set:html={paragraph}></div>)}</div>
 		{relatedPosts.length > 0 && <section class="related" aria-labelledby="related-heading"><div class="related-heading"><p class="eyebrow"><span>↗</span> nearby signals</p><h2 id="related-heading">같은 궤도의 기록</h2></div><div class="related-grid">{relatedPosts.map((relatedPost) => <a href={`/blog/${relatedPost.slug}`}><span class="related-date">{relatedPost.date}</span><strong>{relatedPost.title}</strong><span class="related-arrow">↗</span></a>)}</div></section>}
 		<footer class="post-footer"><span>END OF TRANSMISSION</span><div class="post-actions"><a href={`/admin/?edit=${post.slug}`}>edit note ↗</a><a href="/blog/">browse the archive ↗</a></div></footer>
 	</article>

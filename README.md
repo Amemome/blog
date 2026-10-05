@@ -45,16 +45,17 @@ DB: SQLite. This blog is used and read by one person, so a lightweight setup is 
 - Provide a publish/build status so the author can tell whether a newly published post is deployed.
 - Keep the public site privacy-conscious; do not add tracking or analytics without an explicit decision.
 
-### Current frontend implementation
+### Implemented application surface
 
 - `/blog/` provides a multi-post archive with category filtering, tag filtering, search, empty states, and responsive cards.
 - `/blog/[slug]` provides post details, related posts, and an edit link into the writing page.
-- `/admin/` provides a frontend writing prototype with new-post creation, existing-post editing through `?edit=slug`, Markdown input, live rendered preview, excerpt/slug/category fields, local draft saving/restoration, and inline category creation.
-- The current prototype stores drafts and newly created categories in browser `localStorage`; it does not publish to a server.
+- `/admin/` provides authenticated API-backed create/edit/draft/publish/unpublish/schedule/delete flows, server autosave, local interruption recovery, revision restore, metadata editing, category creation, and media upload.
+- Server routes provide rate-limited login, activity logging, CSRF checks, SQLite backup, JSON export, publish status, and controlled media storage.
+- `/rss.xml`, `/sitemap.xml`, canonical URLs, Open Graph metadata, and sanitized Markdown rendering are generated from published content.
 
-### Remaining backend work
+### Operational follow-up
 
-Strapi CMS integration, durable content and category CRUD, authentication, server-side authorization, protected draft previews, real publishing, media storage, and production backups are not implemented yet. The public build must not be treated as secure until those boundaries are enforced on the server.
+Production deployment still needs encrypted off-host backup retention, a scheduled backup runner, HTTPS/reverse-proxy hardening, and a CI deploy webhook. The current Astro server exposes these local authenticated primitives through `/api/admin/backup`, `/api/admin/export`, and `/api/admin/status`.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the development and deployment architecture.
 

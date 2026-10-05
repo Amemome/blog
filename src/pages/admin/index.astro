@@ -22,18 +22,32 @@ const editSlug = Astro.url.searchParams.get('edit');
 		<div class="draft-status" id="draft-status"><span class="status-dot"></span>local draft ready</div>
 	</section>
 
-	<section class="editor-shell shell" aria-label="글 작성 편집기">
+	<section class="auth-gate shell" id="auth-gate" aria-labelledby="auth-heading">
+		<div class="auth-copy"><p class="eyebrow"><span>LOCKED</span> private authoring space</p><h2 id="auth-heading">패스워드를 입력하면<br /><em>기록을 이어갈 수 있습니다.</em></h2></div>
+		<form class="auth-form" id="login-form"><label class="field"><span class="field-label">ACCESS PASSWORD</span><input id="login-password" type="password" autocomplete="current-password" required /></label><button class="button primary" type="submit">unlock ↗</button><p class="auth-error" id="auth-error" role="alert" hidden>패스워드가 올바르지 않습니다.</p></form>
+	</section>
+
+	<nav class="admin-nav shell requires-auth" id="admin-nav" aria-label="관리자 메뉴" hidden><button class="admin-tab active" type="button" data-admin-view="write">write <span>새 글</span></button><button class="admin-tab" type="button" data-admin-view="posts">posts <span id="post-count">0</span></button></nav>
+
+	<section class="editor-shell shell requires-auth" id="editor-shell" aria-label="글 작성 편집기" hidden>
 		<form class="editor-form" id="editor-form">
 			<div class="editor-toolbar">
 				<div><span class="field-label">EDITING SIGNAL</span></div>
-				<div class="toolbar-actions"><button class="button secondary" id="save-draft" type="button">임시저장</button><button class="button primary" id="publish-preview" type="button">미리보기</button></div>
+				<div class="toolbar-actions"><button class="button secondary" id="save-draft" type="button">상태 저장</button><button class="button secondary" id="publish-preview" type="button">미리보기</button><button class="button secondary" id="restore-revision" type="button">revision 복원</button><button class="button primary" id="publish-post" type="button">글 작성하기 ↗</button></div>
 			</div>
 
 			<div class="metadata-grid">
 				<label class="field field-title"><span class="field-label">TITLE</span><input id="title" name="title" type="text" placeholder="기록의 제목을 입력하세요" required /></label>
-				<div class="field category-field"><span class="field-label">CATEGORY</span><div class="category-control"><select id="category" name="category" required>{categories.map((category) => <option value={category.slug}>{category.name}</option>)}</select><button class="add-category" id="show-category-form" type="button" aria-label="카테고리 추가">+ add</button></div><div class="category-form" id="category-form" hidden><input id="new-category" type="text" placeholder="새 카테고리 이름" /><button class="add-category confirm" id="add-category" type="button">추가</button></div></div>
+				<div class="field category-field"><span class="field-label">CATEGORY</span><div class="category-control"><select id="category" name="category" required>{categories.map((category) => <option value={category.slug}>{category.name}</option>)}</select><button class="add-category" id="show-category-form" type="button" aria-label="카테고리 추가">+ add</button><button class="add-category" id="edit-category" type="button" aria-label="카테고리 수정">edit</button><button class="add-category" id="delete-category" type="button" aria-label="카테고리 삭제">delete</button></div><div class="category-form" id="category-form" hidden><input id="new-category" type="text" placeholder="새 카테고리 이름" /><button class="add-category confirm" id="add-category" type="button">추가</button></div></div>
 				<label class="field"><span class="field-label">SLUG</span><input id="slug" name="slug" type="text" placeholder="post-slug" required /></label>
 				<label class="field field-excerpt"><span class="field-label">EXCERPT</span><input id="excerpt" name="excerpt" type="text" placeholder="목록에 표시될 짧은 설명" /></label>
+				<label class="field"><span class="field-label">STATUS</span><select id="post-status"><option value="draft">draft</option><option value="published">published</option><option value="unpublished">unpublished</option><option value="scheduled">scheduled</option></select></label>
+				<label class="field"><span class="field-label">SCHEDULED AT</span><input id="scheduled-at" type="datetime-local" /></label>
+				<label class="field"><span class="field-label">TAGS</span><input id="tags" type="text" placeholder="design, notes" /></label>
+				<label class="field"><span class="field-label">COVER IMAGE</span><input id="cover-url" type="url" placeholder="/media/image.webp" /></label>
+				<label class="field"><span class="field-label">SOCIAL TITLE</span><input id="social-title" type="text" /></label>
+				<label class="field field-excerpt"><span class="field-label">SOCIAL DESCRIPTION</span><input id="social-description" type="text" /></label>
+				<label class="field field-excerpt"><span class="field-label">MEDIA UPLOAD</span><input id="media-upload" type="file" accept="image/jpeg,image/png,image/webp,image/gif" /><button class="add-category" id="upload-media" type="button">upload / insert</button></label>
 			</div>
 
 			<div class="writing-grid">
@@ -43,104 +57,409 @@ const editSlug = Astro.url.searchParams.get('edit');
 		</form>
 	</section>
 
+	<section class="posts-shell shell requires-auth" id="posts-shell" aria-labelledby="posts-heading" hidden>
+		<div class="posts-heading"><div><p class="eyebrow"><span>05</span> content registry</p><h2 id="posts-heading">작성한 글</h2><p class="posts-lede">작성한 기록의 상태를 확인하고 다음 궤도로 옮깁니다.</p></div><div class="posts-heading-actions"><p class="posts-caption">drafts and published signals</p><button class="new-post-button" type="button" data-admin-view="write"><span>+</span> 새 기록</button></div></div>
+		<div class="posts-overview" aria-label="게시글 현황"><div><span class="overview-label">TOTAL NOTES</span><strong id="total-post-count">00</strong></div><div><span class="overview-label">PUBLISHED</span><strong id="published-post-count">00</strong></div><div><span class="overview-label">DRAFTS</span><strong id="draft-post-count">00</strong></div><div class="overview-signal"><span class="status-dot active"></span><span>registry synced</span></div></div>
+		<div class="registry-toolbar"><label class="registry-search"><span>⌕</span><span class="sr-only">글 검색</span><input id="managed-post-search" type="search" placeholder="제목, slug, 설명 검색" autocomplete="off" /></label><label class="registry-filter"><span class="field-label">VIEW</span><select id="managed-post-filter"><option value="all">all notes</option><option value="published">published</option><option value="draft">drafts</option><option value="scheduled">scheduled</option><option value="unpublished">unpublished</option></select></label></div>
+		<div class="post-manager-list" id="post-manager-list"></div>
+	</section>
+
 	<script type="application/json" id="seed-posts" set:html={JSON.stringify(seedPosts)}></script>
 	<div id="editor-config" data-edit-slug={editSlug ?? ''}></div>
 </BaseLayout>
 
 <script>
 	import { marked } from 'marked';
+	import DOMPurify from 'dompurify';
 
-	const seedPosts = JSON.parse(document.querySelector('#seed-posts')?.textContent || '[]');
+	type SeedPost = { slug: string; title: string; excerpt: string; category: string; date: string; content: string };
+	type EditablePost = Omit<SeedPost, 'date'> & { status: string; scheduledAt: string; tags: string[]; coverUrl: string; socialTitle: string; socialDescription: string };
+	type DraftPost = EditablePost;
+	type LocalCategory = { name: string; slug: string };
+	type ApiPost = { id: number; slug: string; title: string; excerpt: string; category_slug: string; body: string; status: string; updated_at: string; scheduled_at: string | null; tags: string[]; cover_url: string | null; social_title: string | null; social_description: string | null };
+
+	const seedScript = document.querySelector<HTMLScriptElement>('#seed-posts');
+	const seedPosts: EditablePost[] = (JSON.parse(seedScript?.textContent || '[]') as SeedPost[]).map((post) => ({ ...post, status: 'published', scheduledAt: '', tags: [], coverUrl: '', socialTitle: '', socialDescription: '' }));
+	let serverPosts: EditablePost[] = [];
+	let managedPosts: ApiPost[] = [];
+	let loadedServerSlug: string | null = null;
 	const draftKey = 'orbital-notes-drafts';
-	const form = document.querySelector('#editor-form');
-	const editSlug = document.querySelector('#editor-config')?.dataset.editSlug || '';
-	const title = document.querySelector('#title');
-	const category = document.querySelector('#category');
-	const slug = document.querySelector('#slug');
-	const excerpt = document.querySelector('#excerpt');
-	const content = document.querySelector('#content');
-	const preview = document.querySelector('#preview');
-	const status = document.querySelector('#draft-status');
-	const saveDraft = document.querySelector('#save-draft');
-	const publishPreview = document.querySelector('#publish-preview');
-	const categoryForm = document.querySelector('#category-form');
-	const showCategoryForm = document.querySelector('#show-category-form');
-	const newCategory = document.querySelector('#new-category');
-	const addCategory = document.querySelector('#add-category');
+	const form = document.querySelector<HTMLFormElement>('#editor-form');
+	const editSlug = document.querySelector<HTMLElement>('#editor-config')?.dataset.editSlug || '';
+	const authGate = document.querySelector<HTMLElement>('#auth-gate');
+	const editorShell = document.querySelector<HTMLElement>('#editor-shell');
+	const postsShell = document.querySelector<HTMLElement>('#posts-shell');
+	const adminNav = document.querySelector<HTMLElement>('#admin-nav');
+	const loginForm = document.querySelector<HTMLFormElement>('#login-form');
+	const loginPassword = document.querySelector<HTMLInputElement>('#login-password');
+	const authError = document.querySelector<HTMLElement>('#auth-error');
+	const title = document.querySelector<HTMLInputElement>('#title');
+	const category = document.querySelector<HTMLSelectElement>('#category');
+	const slug = document.querySelector<HTMLInputElement>('#slug');
+	const excerpt = document.querySelector<HTMLInputElement>('#excerpt');
+	const content = document.querySelector<HTMLTextAreaElement>('#content');
+	const postStatus = document.querySelector<HTMLSelectElement>('#post-status');
+	const scheduledAt = document.querySelector<HTMLInputElement>('#scheduled-at');
+	const tags = document.querySelector<HTMLInputElement>('#tags');
+	const coverUrl = document.querySelector<HTMLInputElement>('#cover-url');
+	const socialTitle = document.querySelector<HTMLInputElement>('#social-title');
+	const socialDescription = document.querySelector<HTMLInputElement>('#social-description');
+	const preview = document.querySelector<HTMLElement>('#preview');
+	const status = document.querySelector<HTMLElement>('#draft-status');
+	const saveDraft = document.querySelector<HTMLButtonElement>('#save-draft');
+	const publishPreview = document.querySelector<HTMLButtonElement>('#publish-preview');
+	const publishPost = document.querySelector<HTMLButtonElement>('#publish-post');
+	const restoreRevision = document.querySelector<HTMLButtonElement>('#restore-revision');
+	const mediaUpload = document.querySelector<HTMLInputElement>('#media-upload');
+	const uploadMedia = document.querySelector<HTMLButtonElement>('#upload-media');
+	const categoryForm = document.querySelector<HTMLDivElement>('#category-form');
+	const showCategoryForm = document.querySelector<HTMLButtonElement>('#show-category-form');
+	const newCategory = document.querySelector<HTMLInputElement>('#new-category');
+	const addCategory = document.querySelector<HTMLButtonElement>('#add-category');
+	const editCategory = document.querySelector<HTMLButtonElement>('#edit-category');
+	const deleteCategory = document.querySelector<HTMLButtonElement>('#delete-category');
+	const postManagerList = document.querySelector<HTMLElement>('#post-manager-list');
+	const postCount = document.querySelector<HTMLElement>('#post-count');
+	const totalPostCount = document.querySelector<HTMLElement>('#total-post-count');
+	const publishedPostCount = document.querySelector<HTMLElement>('#published-post-count');
+	const draftPostCount = document.querySelector<HTMLElement>('#draft-post-count');
+	const managedPostSearch = document.querySelector<HTMLInputElement>('#managed-post-search');
+	const managedPostFilter = document.querySelector<HTMLSelectElement>('#managed-post-filter');
+	const adminTabs = [...document.querySelectorAll<HTMLButtonElement>('[data-admin-view]')];
+	let autosaveTimer: number | undefined;
 
-	const getDrafts = () => JSON.parse(localStorage.getItem(draftKey) || '{}');
+	const getDrafts = (): Record<string, DraftPost> => JSON.parse(localStorage.getItem(draftKey) || '{}');
+	const getCsrfToken = () => document.cookie.split('; ').find((cookie) => cookie.startsWith('blog_csrf='))?.split('=')[1] || '';
 	const categoryKey = 'orbital-notes-categories';
-	const getLocalCategories = () => JSON.parse(localStorage.getItem(categoryKey) || '[]');
-	const setStatus = (message, active = false) => {
+	const getLocalCategories = (): LocalCategory[] => JSON.parse(localStorage.getItem(categoryKey) || '[]');
+	const setStatus = (message: string, active = false) => {
 		if (status) status.innerHTML = `<span class="status-dot${active ? ' active' : ''}"></span>${message}`;
 	};
-	const currentPost = () => ({ slug: slug.value.trim(), title: title.value.trim(), excerpt: excerpt.value.trim(), category: category.value, content: content.value });
-	const findPost = (postSlug) => seedPosts.find((post) => post.slug === postSlug);
+	const currentPost = (): DraftPost => ({ slug: slug?.value.trim() || '', title: title?.value.trim() || '', excerpt: excerpt?.value.trim() || '', category: category?.value || '', content: content?.value || '', status: postStatus?.value || 'draft', scheduledAt: scheduledAt?.value || '', tags: (tags?.value || '').split(',').map((tag) => tag.trim()).filter(Boolean), coverUrl: coverUrl?.value.trim() || '', socialTitle: socialTitle?.value.trim() || '', socialDescription: socialDescription?.value.trim() || '' });
+	const findPost = (postSlug: string) => (serverPosts.length ? serverPosts : seedPosts).find((post) => post.slug === postSlug);
 
-	function renderPreview() {
-		if (preview) preview.innerHTML = marked.parse(content.value || '*작성 중인 Markdown이 여기에 나타납니다.*');
+	function switchAdminView(view: string) {
+		const showPosts = view === 'posts';
+		if (editorShell) editorShell.hidden = showPosts;
+		if (postsShell) postsShell.hidden = !showPosts;
+		adminTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.adminView === view));
 	}
 
-	function loadPost(postSlug) {
-		const source = postSlug === 'new' ? { slug: '', title: '', excerpt: '', category: category.options[0]?.value || '', content: '' } : findPost(postSlug);
+	function renderPostManager() {
+		if (!postManagerList) return;
+		postManagerList.replaceChildren();
+		const query = managedPostSearch?.value.trim().toLowerCase() || '';
+		const selectedStatus = managedPostFilter?.value || 'all';
+		const visiblePosts = managedPosts.filter((post) => {
+			const matchesStatus = selectedStatus === 'all' || post.status === selectedStatus;
+			const searchable = `${post.title} ${post.slug} ${post.excerpt} ${post.category_slug}`.toLowerCase();
+			return matchesStatus && (!query || searchable.includes(query));
+		});
+		if (postCount) postCount.textContent = String(managedPosts.length).padStart(2, '0');
+		if (totalPostCount) totalPostCount.textContent = String(managedPosts.length).padStart(2, '0');
+		if (publishedPostCount) publishedPostCount.textContent = String(managedPosts.filter((post) => post.status === 'published').length).padStart(2, '0');
+		if (draftPostCount) draftPostCount.textContent = String(managedPosts.filter((post) => post.status === 'draft').length).padStart(2, '0');
+		if (!visiblePosts.length) {
+			const empty = document.createElement('p');
+			empty.className = 'posts-empty';
+			empty.textContent = managedPosts.length ? '현재 필터에 맞는 기록이 없습니다.' : '아직 저장된 글이 없습니다.';
+			postManagerList.append(empty);
+			return;
+		}
+		const escapeHtml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+		visiblePosts.forEach((post, index) => {
+			const item = document.createElement('article');
+			item.className = 'managed-post';
+			const safeTitle = escapeHtml(post.title);
+			const safeExcerpt = escapeHtml(post.excerpt || '설명이 없습니다.');
+			const safeCategory = escapeHtml(post.category_slug);
+			const safeSlug = escapeHtml(post.slug);
+			item.innerHTML = `<span class="managed-index">${String(index + 1).padStart(2, '0')}</span><div class="managed-main"><div class="managed-meta"><span class="status-pill ${escapeHtml(post.status)}">${escapeHtml(post.status)}</span><span class="managed-category">${safeCategory}</span><span class="managed-updated">updated ${escapeHtml(post.updated_at.slice(0, 10))}</span></div><h3>${safeTitle}</h3><p>${safeExcerpt}</p><span class="managed-slug">/${safeSlug}</span></div><div class="managed-actions"><a class="managed-edit" href="/admin/?edit=${encodeURIComponent(post.slug)}"><span>↗</span> 편집</a><button class="managed-delete" type="button" data-delete-slug="${safeSlug}"><span>×</span> 삭제</button></div>`;
+			postManagerList.append(item);
+		});
+	}
+
+	function renderPreview() {
+		const rendered = marked.parse(content?.value || '*작성 중인 Markdown이 여기에 나타납니다.*');
+		if (preview) preview.innerHTML = DOMPurify.sanitize(typeof rendered === 'string' ? rendered : '');
+	}
+
+	function loadPost(postSlug: string) {
+		const source = postSlug === 'new' ? { slug: '', title: '', excerpt: '', category: category?.options[0]?.value || '', content: '', status: 'draft', scheduledAt: '', tags: [], coverUrl: '', socialTitle: '', socialDescription: '' } : findPost(postSlug);
 		const saved = postSlug === 'new' ? null : getDrafts()[postSlug];
 		const next = saved || source;
 		if (!next) return;
-		title.value = next.title || '';
-		excerpt.value = next.excerpt || '';
-		category.value = next.category || category.options[0]?.value || '';
-		slug.value = next.slug || '';
-		content.value = next.content || '';
+		loadedServerSlug = postSlug === 'new' ? null : postSlug;
+		if (title) title.value = next.title || '';
+		if (excerpt) excerpt.value = next.excerpt || '';
+		if (category) category.value = next.category || category.options[0]?.value || '';
+		if (slug) slug.value = next.slug || '';
+		if (content) content.value = next.content || '';
+		if (postStatus) postStatus.value = next.status || 'draft';
+		if (scheduledAt) scheduledAt.value = next.scheduledAt || '';
+		if (tags) tags.value = next.tags?.join(', ') || '';
+		if (coverUrl) coverUrl.value = next.coverUrl || '';
+		if (socialTitle) socialTitle.value = next.socialTitle || '';
+		if (socialDescription) socialDescription.value = next.socialDescription || '';
 		renderPreview();
 		setStatus(saved ? 'local draft restored' : 'local draft ready', Boolean(saved));
 	}
 
-	function persistDraft() {
-		const post = currentPost();
-		const key = post.slug || 'new';
-		const drafts = getDrafts();
-		drafts[key] = post;
-		localStorage.setItem(draftKey, JSON.stringify(drafts));
-		setStatus(`saved locally / ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`, true);
+	async function loadServerData() {
+		const [postsResponse, categoriesResponse] = await Promise.all([
+			fetch('/api/posts?includeDrafts=true', { credentials: 'include' }),
+			fetch('/api/categories', { credentials: 'include' }),
+		]);
+		if (!postsResponse.ok || !categoriesResponse.ok) throw new Error('server_data_unavailable');
+		const postData = await postsResponse.json() as { posts: ApiPost[] };
+		const categoryData = await categoriesResponse.json() as { categories: LocalCategory[] };
+		managedPosts = postData.posts;
+		serverPosts = managedPosts.map((post) => ({ slug: post.slug, title: post.title, excerpt: post.excerpt, category: post.category_slug, date: '', content: post.body, status: post.status, scheduledAt: post.scheduled_at || '', tags: post.tags, coverUrl: post.cover_url || '', socialTitle: post.social_title || '', socialDescription: post.social_description || '' }));
+		if (category) {
+			category.replaceChildren(...categoryData.categories.map((item) => new Option(item.name, item.slug)));
+		}
+		loadPost(editSlug || 'new');
+		renderPostManager();
 	}
 
-	function addLocalCategory() {
+	async function refreshPostManager() {
+		const response = await fetch('/api/posts?includeDrafts=true', { credentials: 'include' });
+		if (!response.ok) throw new Error('post_list_unavailable');
+		const data = await response.json() as { posts: ApiPost[] };
+		managedPosts = data.posts;
+		renderPostManager();
+	}
+
+	function unlockEditor() {
+		if (authGate) authGate.hidden = true;
+		if (editorShell) editorShell.hidden = false;
+		if (adminNav) adminNav.hidden = false;
+	}
+
+	async function persistPost(status: string) {
+		const post = currentPost();
+		post.status = status;
+		const drafts = getDrafts();
+		drafts[post.slug || 'new'] = post;
+		localStorage.setItem(draftKey, JSON.stringify(drafts));
+		const method = loadedServerSlug ? 'PUT' : 'POST';
+		const endpoint = loadedServerSlug ? `/api/posts/${encodeURIComponent(loadedServerSlug)}` : '/api/posts';
+		const response = await fetch(endpoint, { method, credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() }, body: JSON.stringify({ title: post.title, slug: post.slug, excerpt: post.excerpt, body: post.content, category: post.category, tags: post.tags, status, scheduledAt: post.scheduledAt ? new Date(post.scheduledAt).toISOString() : null, coverUrl: post.coverUrl || null, socialTitle: post.socialTitle || null, socialDescription: post.socialDescription || null }) });
+		if (!response.ok) throw new Error('post_save_failed');
+		loadedServerSlug = post.slug;
+		await refreshPostManager();
+		setStatus(status === 'published' ? 'published to server' : `saved draft / ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`, true);
+	}
+
+	async function addLocalCategory() {
 		const name = newCategory?.value.trim();
 		if (!name) return;
-		const nextCategory = { name, slug: `local-${Date.now()}` };
-		const localCategories = [...getLocalCategories(), nextCategory];
-		localStorage.setItem(categoryKey, JSON.stringify(localCategories));
+		const nextCategory = { name, slug: `category-${Date.now()}` };
+		const response = await fetch('/api/categories', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() }, body: JSON.stringify(nextCategory) });
+		if (!response.ok) {
+			setStatus('category could not be saved', true);
+			return;
+		}
 		const option = new Option(nextCategory.name, nextCategory.slug, true, true);
-		category.add(option);
-		newCategory.value = '';
-		categoryForm.hidden = true;
+		category?.add(option);
+		if (newCategory) newCategory.value = '';
+		if (categoryForm) categoryForm.hidden = true;
 		setStatus(`category added / ${name}`, true);
 	}
 
-	getLocalCategories().forEach((localCategory) => category.add(new Option(localCategory.name, localCategory.slug)));
+	async function editSelectedCategory() {
+		const currentSlug = category?.value;
+		if (!currentSlug) return;
+		const name = window.prompt('새 카테고리 이름', category?.selectedOptions[0]?.textContent ?? '');
+		if (!name?.trim()) return;
+		const response = await fetch(`/api/categories/${encodeURIComponent(currentSlug)}`, { method: 'PUT', credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() }, body: JSON.stringify({ name: name.trim(), slug: currentSlug, accent: 'violet' }) });
+		if (!response.ok) throw new Error('category_update_failed');
+		await loadServerData();
+		setStatus('category updated', true);
+	}
 
-	[title, category, slug, excerpt, content].forEach((field) => field?.addEventListener('input', renderPreview));
-	content?.addEventListener('input', () => setStatus('unsaved changes', true));
+	async function deleteSelectedCategory() {
+		const currentSlug = category?.value;
+		if (!currentSlug || !window.confirm('선택한 카테고리를 삭제할까요?')) return;
+		const response = await fetch(`/api/categories/${encodeURIComponent(currentSlug)}`, { method: 'DELETE', credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() } });
+		if (!response.ok) throw new Error('category_delete_failed');
+		await loadServerData();
+		setStatus('category deleted', true);
+	}
+
+	async function restoreSelectedRevision() {
+		if (!loadedServerSlug) return setStatus('save the post before restoring a revision', true);
+		const response = await fetch(`/api/posts/${encodeURIComponent(loadedServerSlug)}/revisions`, { credentials: 'include' });
+		if (!response.ok) throw new Error('revision_list_failed');
+		const data = await response.json() as { revisions: { id: number; createdAt: string }[] };
+		if (!data.revisions.length) return setStatus('no revisions yet', true);
+		const revisionId = window.prompt(`복원할 revision ID를 입력하세요: ${data.revisions.map((revision) => `${revision.id} (${revision.createdAt})`).join(', ')}`);
+		if (!revisionId || !window.confirm('선택한 revision으로 복원할까요?')) return;
+		const restoreResponse = await fetch(`/api/posts/${encodeURIComponent(loadedServerSlug)}/revisions`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() }, body: JSON.stringify({ revisionId: Number(revisionId) }) });
+		if (!restoreResponse.ok) throw new Error('revision_restore_failed');
+		await loadServerData();
+		setStatus('revision restored', true);
+	}
+
+	async function uploadSelectedMedia() {
+		const file = mediaUpload?.files?.[0];
+		if (!file) return;
+		const formData = new FormData();
+		formData.append('file', file);
+		const response = await fetch('/api/media', { method: 'POST', credentials: 'include', headers: { 'x-csrf-token': getCsrfToken() }, body: formData });
+		if (!response.ok) throw new Error('media_upload_failed');
+		const data = await response.json() as { url: string };
+		if (coverUrl) coverUrl.value = data.url;
+		if (content) content.value += `${content.value ? '\n\n' : ''}![${file.name}](${data.url})`;
+		renderPreview();
+		setStatus('media uploaded and inserted', true);
+	}
+
+	getLocalCategories().forEach((localCategory: LocalCategory) => category?.add(new Option(localCategory.name, localCategory.slug)));
+
+	[title, category, slug, excerpt, content, postStatus, scheduledAt, tags, coverUrl, socialTitle, socialDescription].forEach((field) => field?.addEventListener('input', () => {
+		renderPreview();
+		const post = currentPost();
+		if (post.slug || post.title || post.content) localStorage.setItem(draftKey, JSON.stringify({ ...getDrafts(), [post.slug || 'new']: post }));
+		setStatus('unsaved changes', true);
+		window.clearTimeout(autosaveTimer);
+		if (post.title && post.slug && post.category) autosaveTimer = window.setTimeout(() => void persistPost(post.status || 'draft').catch(() => setStatus('autosave failed', true)), 1200);
+	}));
 	showCategoryForm?.addEventListener('click', () => {
+		if (!categoryForm) return;
 		categoryForm.hidden = !categoryForm.hidden;
 		if (!categoryForm.hidden) newCategory?.focus();
 	});
-	addCategory?.addEventListener('click', addLocalCategory);
-	newCategory?.addEventListener('keydown', (event) => {
-		if (event.key === 'Enter') addLocalCategory();
+	addCategory?.addEventListener('click', () => void addLocalCategory());
+	editCategory?.addEventListener('click', () => void editSelectedCategory().catch(() => setStatus('category update failed', true)));
+	deleteCategory?.addEventListener('click', () => void deleteSelectedCategory().catch(() => setStatus('category delete failed', true)));
+	restoreRevision?.addEventListener('click', () => void restoreSelectedRevision().catch(() => setStatus('revision restore failed', true)));
+	uploadMedia?.addEventListener('click', () => void uploadSelectedMedia().catch(() => setStatus('media upload failed', true)));
+	newCategory?.addEventListener('keydown', (event: KeyboardEvent) => {
+		if (event.key === 'Enter') void addLocalCategory();
 	});
-	saveDraft?.addEventListener('click', persistDraft);
+	saveDraft?.addEventListener('click', () => void persistPost(postStatus?.value || 'draft').catch(() => setStatus('server save failed', true)));
 	publishPreview?.addEventListener('click', () => {
-		persistDraft();
-		setStatus('preview is ready / publish later', true);
 		preview?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	});
+	publishPost?.addEventListener('click', () => void persistPost('published').then(() => window.location.assign('/')).catch(() => setStatus('server publish failed', true)));
 	form?.addEventListener('submit', (event) => event.preventDefault());
-	loadPost(editSlug || 'new');
+	adminTabs.forEach((tab) => tab.addEventListener('click', () => switchAdminView(tab.dataset.adminView || 'write')));
+	managedPostSearch?.addEventListener('input', renderPostManager);
+	managedPostFilter?.addEventListener('change', renderPostManager);
+	async function deletePost(postSlug: string) {
+		const response = await fetch(`/api/posts/${encodeURIComponent(postSlug)}`, { method: 'DELETE', credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() } });
+		if (!response.ok) {
+			const error = await response.json().catch(() => ({ error: 'delete_failed' }));
+			throw new Error(error.error || 'delete_failed');
+		}
+		managedPosts = managedPosts.filter((post) => post.slug !== postSlug);
+		renderPostManager();
+		setStatus('post deleted', true);
+	}
+	postManagerList?.addEventListener('click', (event) => {
+		const target = event.target as HTMLElement;
+		const deleteButton = target.closest<HTMLButtonElement>('[data-delete-slug]');
+		if (!deleteButton) return;
+		const postSlug = deleteButton.dataset.deleteSlug;
+		if (!postSlug || !window.confirm('이 글을 삭제할까요?')) return;
+		void deletePost(postSlug).catch((error: Error) => setStatus(`delete failed / ${error.message}`, true));
+	});
+
+	loginForm?.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		if (authError) authError.hidden = true;
+		const response = await fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: loginPassword?.value || '' }) });
+		if (!response.ok) {
+			if (authError) authError.hidden = false;
+			return;
+		}
+		unlockEditor();
+		try {
+			await loadServerData();
+		} catch {
+			setStatus('server data unavailable', true);
+		}
+	});
+
+	async function bootstrap() {
+		const response = await fetch('/api/auth/me', { credentials: 'include' });
+		if (!response.ok || !(await response.json()).authenticated) return;
+		unlockEditor();
+		try {
+			await loadServerData();
+		} catch {
+			setStatus('server data unavailable', true);
+		}
+	}
+	void bootstrap();
 </script>
 
 <style>
 	.admin-hero { display:flex; justify-content:space-between; align-items:end; gap:30px; padding:82px 0 62px; }.eyebrow { margin:0 0 22px; color:var(--muted); font:.65rem 'DM Mono',monospace; letter-spacing:.1em; text-transform:uppercase; }.eyebrow span { margin-right:13px; color:var(--cyan); }.admin-hero h1 { margin:0; font-size:clamp(2.7rem,6vw,5.4rem); line-height:.96; letter-spacing:-.07em; font-weight:500; }.admin-hero h1 em { color:var(--violet); font-style:normal; }.draft-status { display:flex; align-items:center; gap:8px; color:var(--muted); font:.62rem 'DM Mono',monospace; text-transform:uppercase; letter-spacing:.08em; }.status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--faint); }.status-dot.active { background:var(--cyan); box-shadow:0 0 12px var(--cyan); }.editor-shell { padding-bottom:100px; }.editor-form { border:1px solid var(--line); background:rgba(13,17,36,.7); }.editor-toolbar { display:flex; justify-content:space-between; align-items:end; gap:20px; padding:22px 25px; border-bottom:1px solid var(--line); }.select-field { display:flex; flex-direction:column; gap:9px; }.field-label { color:var(--faint); font:.58rem 'DM Mono',monospace; letter-spacing:.1em; }.select-field select,.field input,.field select { min-width:220px; padding:0; color:var(--ink); border:0; outline:0; background:transparent; font:.85rem 'Space Grotesk',sans-serif; }.select-field select option,.field select option { color:#101326; }.toolbar-actions { display:flex; gap:9px; }.button { padding:10px 15px; border:1px solid var(--line); border-radius:2px; color:var(--ink); font:.65rem 'DM Mono',monospace; cursor:pointer; }.button.secondary { background:transparent; }.button.primary { border-color:var(--cyan); background:rgba(98,220,232,.1); }.button:hover { transform:translateY(-1px); }.metadata-grid { display:grid; grid-template-columns:1.5fr .7fr 1fr; gap:22px; padding:28px 25px; border-bottom:1px solid var(--line); }.field { display:flex; flex-direction:column; gap:10px; min-width:0; }.field input,.field select { width:100%; padding-bottom:9px; border-bottom:1px solid var(--line); }.field input:focus,.field select:focus { border-color:var(--cyan); }.field-title { grid-column:span 2; }.field-title input { font-size:1.35rem; }.field-excerpt { grid-column:span 3; }.writing-grid { display:grid; grid-template-columns:1fr 1fr; min-height:560px; }.markdown-pane,.preview-pane { min-width:0; }.markdown-pane { border-right:1px solid var(--line); }.pane-heading { display:flex; justify-content:space-between; padding:16px 20px; color:var(--muted); border-bottom:1px solid var(--line); font:.6rem 'DM Mono',monospace; letter-spacing:.08em; }.pane-heading small { color:var(--faint); text-transform:lowercase; }.markdown-pane textarea { display:block; width:100%; height:500px; padding:25px 24px; resize:vertical; color:#cbd4ec; border:0; outline:0; background:transparent; font:1rem/1.85 'DM Mono',monospace; }.markdown-pane textarea::placeholder { color:var(--faint); }.markdown-preview { min-height:500px; padding:25px 30px; color:#cbd4ec; }.markdown-preview h1,.markdown-preview h2,.markdown-preview h3 { color:var(--ink); line-height:1.2; letter-spacing:-.04em; }.markdown-preview h1 { font-size:2rem; }.markdown-preview h2 { font-size:1.5rem; }.markdown-preview p,.markdown-preview ul,.markdown-preview ol { line-height:1.85; }.markdown-preview blockquote { margin:22px 0; padding-left:18px; color:var(--muted); border-left:2px solid var(--violet); }.markdown-preview code { padding:3px 5px; color:var(--cyan); background:rgba(98,220,232,.08); font:.85em 'DM Mono',monospace; }.markdown-preview pre { overflow:auto; padding:16px; background:#080a16; }.markdown-preview pre code { padding:0; }.markdown-preview a { color:var(--cyan); text-decoration:underline; text-underline-offset:3px; }.markdown-preview hr { border:0; border-top:1px solid var(--line); }.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
 	.category-control { display:flex; align-items:end; gap:9px; }.category-control select { flex:1; min-width:0; }.add-category { padding:7px 9px; color:var(--cyan); border:1px solid var(--line); background:transparent; font:.58rem 'DM Mono',monospace; cursor:pointer; }.add-category:hover { border-color:var(--cyan); }.category-form { display:flex; gap:7px; margin-top:9px; }.category-form[hidden] { display:none; }.category-form input { min-width:0; flex:1; padding:7px 8px; color:var(--ink); border:1px solid var(--line); outline:0; background:transparent; font:.7rem 'Space Grotesk',sans-serif; }.category-form input:focus { border-color:var(--cyan); }.add-category.confirm { color:var(--ink); border-color:var(--cyan); }
+	.auth-gate { display:grid; grid-template-columns:1fr .8fr; gap:70px; align-items:end; padding:35px 0 75px; }.auth-gate[hidden],.editor-shell[hidden] { display:none; }.auth-copy h2 { margin:0; font-size:clamp(1.8rem,4vw,3.4rem); line-height:1; letter-spacing:-.06em; font-weight:500; }.auth-copy h2 em { color:var(--violet); font-style:normal; }.auth-form { display:flex; align-items:end; gap:12px; }.auth-form .field { flex:1; }.auth-form input { width:100%; padding:11px 0; color:var(--ink); border:0; border-bottom:1px solid var(--line); outline:0; background:transparent; }.auth-form input:focus { border-color:var(--cyan); }.auth-error { grid-column:1/-1; margin:0; color:#ef8b9d; font:.7rem 'DM Mono',monospace; }.auth-error[hidden] { display:none; }
+	.admin-nav { display:flex; gap:24px; padding-bottom:18px; border-bottom:1px solid var(--line); }.admin-nav[hidden],.posts-shell[hidden] { display:none; }.admin-tab { padding:0 0 10px; color:var(--faint); border:0; border-bottom:1px solid transparent; background:transparent; font:.7rem 'DM Mono',monospace; cursor:pointer; text-transform:uppercase; letter-spacing:.08em; }.admin-tab span { margin-left:7px; color:var(--cyan); }.admin-tab.active,.admin-tab:hover { color:var(--ink); border-color:var(--cyan); }.posts-shell { padding-bottom:100px; }.posts-heading { display:flex; justify-content:space-between; align-items:end; gap:20px; padding:62px 0 28px; }.posts-heading h2 { margin:0; font-size:2rem; font-weight:500; letter-spacing:-.05em; }.posts-caption { margin:0; color:var(--faint); font:.62rem 'DM Mono',monospace; text-transform:uppercase; }.post-manager-list { padding:12px 18px 0; border:1px solid var(--line); background:rgba(13,17,36,.58); }.managed-post { display:grid; grid-template-columns:42px 1fr auto; gap:20px; align-items:start; padding:24px 6px; border-bottom:1px solid var(--line); }.managed-post:last-child { border-bottom:0; }.managed-post:hover { background:rgba(30,37,70,.34); }.managed-index { color:var(--cyan); font:.65rem 'DM Mono',monospace; }.managed-main h3 { margin:8px 0 8px; font-size:1.15rem; font-weight:500; }.managed-main p { margin:0; color:var(--muted); font-size:.85rem; }.managed-meta { display:flex; gap:12px; color:var(--faint); font:.6rem 'DM Mono',monospace; text-transform:uppercase; }.status-pill { padding:4px 7px; color:var(--cyan); border:1px solid rgba(98,220,232,.32); }.status-pill.draft { color:var(--amber); border-color:rgba(239,187,117,.38); }.managed-actions { display:flex; gap:8px; font:.62rem 'DM Mono',monospace; text-transform:uppercase; }.managed-edit,.managed-delete { padding:7px 9px; border:1px solid var(--line); background:transparent; font:inherit; cursor:pointer; }.managed-edit { color:var(--cyan); }.managed-edit:hover { border-color:var(--cyan); }.managed-delete { color:#ef8b9d; }.managed-delete:hover { border-color:#ef8b9d; }.posts-empty { padding:45px 0; color:var(--muted); text-align:center; font:.8rem 'DM Mono',monospace; }
 	@media(max-width:700px) { .admin-hero { align-items:start; flex-direction:column; padding:62px 0 45px; }.draft-status { align-self:end; }.editor-toolbar { align-items:start; flex-direction:column; }.toolbar-actions { width:100%; }.button { flex:1; }.metadata-grid { grid-template-columns:1fr; }.field-title,.field-excerpt { grid-column:auto; }.writing-grid { grid-template-columns:1fr; }.markdown-pane { border-right:0; border-bottom:1px solid var(--line); }.markdown-pane textarea,.markdown-preview { min-height:360px; height:360px; } }
+</style>
+
+<style is:global>
+	.posts-heading-actions { display:flex; align-items:center; gap:18px; }
+	.posts-lede { margin:14px 0 0; color:var(--muted); font-size:.86rem; line-height:1.6; }
+	.new-post-button { display:inline-flex; align-items:center; gap:8px; padding:10px 13px; color:var(--void); border:1px solid var(--cyan); background:var(--cyan); font:.66rem 'DM Mono',monospace; cursor:pointer; transition:background .2s, color .2s, transform .2s; }
+	.new-post-button span { font-size:1rem; line-height:.7; }
+	.new-post-button:hover { color:var(--ink); background:transparent; transform:translateY(-2px); }
+	.post-manager-list { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; padding:0; overflow:visible; border:0; background:transparent; }
+	.posts-overview { display:grid; grid-template-columns:repeat(3, minmax(120px, 1fr)) auto; gap:1px; margin:30px 0 18px; border:1px solid var(--line); background:var(--line); }
+	.posts-overview > div { min-height:88px; padding:16px 18px; background:rgba(13,17,36,.82); }
+	.overview-label { display:block; margin-bottom:12px; color:var(--faint); font:.57rem 'DM Mono',monospace; letter-spacing:.08em; }
+	.posts-overview strong { color:var(--ink); font:1.65rem 'Space Grotesk',sans-serif; font-weight:400; letter-spacing:-.04em; }
+	.posts-overview > div:nth-child(2) strong { color:var(--cyan); }
+	.posts-overview > div:nth-child(3) strong { color:var(--amber); }
+	.overview-signal { display:flex; min-width:180px; align-items:center; gap:9px; color:var(--muted); font:.6rem 'DM Mono',monospace; text-transform:uppercase; letter-spacing:.06em; }
+	.registry-toolbar { display:flex; justify-content:space-between; align-items:end; gap:20px; margin:28px 0 12px; padding:0 2px 13px; border-bottom:1px solid var(--line); }
+	.registry-search { display:flex; align-items:center; gap:10px; width:min(390px, 100%); padding:8px 0; color:var(--cyan); border-bottom:1px solid var(--line); }
+	.registry-search input { width:100%; color:var(--ink); border:0; outline:0; background:transparent; font:.76rem 'Space Grotesk',sans-serif; }
+	.registry-search input::placeholder { color:var(--faint); }
+	.registry-filter { display:flex; align-items:center; gap:11px; }
+	.registry-filter select { padding:8px 27px 8px 10px; color:var(--ink); border:1px solid var(--line); border-radius:2px; outline:0; background:rgba(13,17,36,.82); font:.65rem 'DM Mono',monospace; }
+	.managed-post { position:relative; grid-template-columns:58px minmax(0, 1fr); gap:18px; min-height:226px; padding:23px; border:1px solid var(--line); background:linear-gradient(135deg,rgba(26,31,65,.86),rgba(10,13,29,.82)); transition:background .2s, border-color .2s, transform .2s; }
+	.managed-post::after { position:absolute; right:20px; bottom:18px; width:72px; height:30px; border:1px solid rgba(98,220,232,.16); border-radius:50%; content:''; transform:rotate(-18deg); pointer-events:none; }
+	.managed-post:hover { border-color:rgba(98,220,232,.5); background:linear-gradient(135deg,rgba(35,42,78,.94),rgba(13,18,38,.9)); transform:translateY(-2px); }
+	.managed-index { display:grid; place-items:center; align-self:start; width:50px; height:50px; padding:0; color:var(--cyan); border:1px solid rgba(98,220,232,.48); border-radius:50%; font-size:.7rem; transform:rotate(-12deg) scaleY(.78); }
+	.managed-main { min-width:0; }
+	.managed-meta { align-items:center; gap:10px; }
+	.managed-category, .managed-updated { color:var(--faint); }
+	.managed-updated { margin-left:auto; }
+	.managed-main h3 { max-width:680px; margin:13px 0 7px; overflow:hidden; font-size:1.2rem; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; }
+	.managed-main p { max-width:700px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+	.managed-slug { display:block; margin-top:13px; color:var(--faint); font:.58rem 'DM Mono',monospace; }
+	.status-pill { padding:5px 8px; border-radius:2px; font-size:.56rem; letter-spacing:.08em; }
+	.status-pill.published { color:var(--cyan); border-color:rgba(98,220,232,.45); background:rgba(98,220,232,.08); }
+	.status-pill.scheduled { color:var(--violet); border-color:rgba(167,155,255,.45); background:rgba(167,155,255,.08); }
+	.status-pill.unpublished, .status-pill.deleted { color:#ef8b9d; border-color:rgba(239,139,157,.4); background:rgba(239,139,157,.07); }
+	.managed-actions { grid-column:2; align-self:end; display:flex; align-items:center; gap:12px; padding-top:18px; }
+	.managed-edit, .managed-delete { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:9px 14px; border-radius:3px; font-size:.62rem; transition:background .2s, border-color .2s, color .2s, transform .2s; }
+	.managed-edit { color:var(--cyan); border-color:rgba(98,220,232,.42); background:rgba(98,220,232,.08); }
+	.managed-delete { color:#ef8b9d; border-color:rgba(239,139,157,.3); background:rgba(239,139,157,.03); }
+	.managed-edit span, .managed-delete span { font-size:1rem; line-height:.7; }
+	.managed-edit:hover { color:var(--void); border-color:var(--cyan); background:var(--cyan); transform:translateY(-1px); }
+	.managed-delete:hover { color:#fff; border-color:#ef8b9d; background:rgba(239,139,157,.16); transform:translateY(-1px); }
+	.posts-empty { margin:0; padding:55px 25px; color:var(--muted); text-align:center; font:.7rem 'DM Mono',monospace; }
+	@media(max-width:700px) {
+		.posts-heading { align-items:flex-start; flex-direction:column; gap:18px; }
+		.posts-heading-actions { justify-content:space-between; width:100%; }
+		.posts-overview { grid-template-columns:repeat(2, 1fr); }
+		.overview-signal { min-width:0; }
+		.registry-toolbar { align-items:stretch; flex-direction:column; gap:14px; }
+		.registry-search { width:100%; }
+		.registry-filter { justify-content:space-between; }
+		.registry-filter select { flex:1; }
+		.post-manager-list { grid-template-columns:1fr; }
+		.managed-post { grid-template-columns:42px minmax(0, 1fr); gap:14px; min-height:208px; padding:20px 17px; }
+		.managed-index { width:38px; height:38px; }
+		.managed-actions { grid-column:2; justify-content:flex-start; padding-top:4px; }
+		.managed-updated { display:none; }
+		.managed-main h3, .managed-main p { white-space:normal; }
+	}
 </style>

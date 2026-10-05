@@ -1,7 +1,9 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { allTags, posts } from '../data/posts';
+import { allPublishedTags, getPublishedPosts } from '../lib/server/content';
 
+const posts = getPublishedPosts();
+const allTags = allPublishedTags();
 const featuredPost = posts[0];
 const archivePosts = posts.slice(1);
 ---
