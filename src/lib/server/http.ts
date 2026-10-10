@@ -1,5 +1,5 @@
 import type { APIContext, APIRoute } from 'astro';
-import { getSession, hasValidCsrf } from './auth';
+import { getSession, hasValidCsrf, syncCsrfCookie } from './auth';
 
 export const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
 
@@ -14,6 +14,7 @@ export const readJson = async <T>(request: Request) => {
 export const requireSession = (context: APIContext, mutation = false) => {
 	const session = getSession(context);
 	if (!session) return { response: json({ error: 'authentication_required' }, 401) } as const;
+	syncCsrfCookie(context, session.csrf_token);
 	if (mutation && !hasValidCsrf(context, session)) return { response: json({ error: 'csrf_validation_failed' }, 403) } as const;
 	return { session } as const;
 };

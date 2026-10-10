@@ -28,7 +28,6 @@ const toPost = (record: PostRecord): Post => {
 };
 
 export const getPublishedPosts = () => {
-	db.prepare("UPDATE posts SET status = 'published', published_at = scheduled_at, scheduled_at = NULL, updated_at = ? WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?").run(new Date().toISOString(), new Date().toISOString());
 	const records = db.prepare("SELECT * FROM posts WHERE status = 'published' ORDER BY published_at DESC, updated_at DESC").all() as PostRecord[];
 	return records.map(toPost);
 };

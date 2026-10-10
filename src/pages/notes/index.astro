@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPublishedNotes } from '../../lib/server/notes';
+
+const notes = getPublishedNotes();
+---
+
+<BaseLayout title="NOTES / ORBITAL NOTES" description="짧게 남긴 생각과 순간의 기록.">
+	<section class="notes-page shell" aria-labelledby="notes-heading">
+		<header class="notes-header">
+			<div>
+				<p class="eyebrow"><span>04</span> quick signals</p>
+				<h1 id="notes-heading">생각나는 대로<br /><em>짧게 남깁니다.</em></h1>
+			</div>
+			<p class="notes-intro">완성된 글이 되기 전의 문장, 지나가다 붙잡은 생각, 오늘만 필요한 메모를 모아둡니다.</p>
+		</header>
+		<div class="notes-stream">
+			{notes.length ? notes.map((note) => <article class="note-card" id={`note-${note.id}`}>
+				<header><span class="note-mark">✦</span><time datetime={note.created_at}>{note.created_at.slice(0, 16).replace('T', ' ')}</time></header>
+				<div class="note-body" set:html={note.html}></div>
+			</article>) : <p class="empty-state">아직 공개된 짧은 생각이 없습니다.</p>}
+		</div>
+	</section>
+</BaseLayout>
+
+<style>
+	.notes-page { padding:90px 0 120px; }.notes-header { display:flex; justify-content:space-between; align-items:end; gap:50px; padding-bottom:62px; border-bottom:1px solid var(--line); }.eyebrow { margin:0 0 22px; color:var(--muted); font:.65rem 'DM Mono',monospace; letter-spacing:.1em; text-transform:uppercase; }.eyebrow span { margin-right:13px; color:var(--cyan); }.notes-header h1 { margin:0; font-size:clamp(2.7rem,6vw,5.8rem); line-height:.96; letter-spacing:-.07em; font-weight:500; }.notes-header h1 em { color:var(--violet); font-style:normal; }.notes-intro { max-width:330px; margin:0; color:var(--muted); font-size:.95rem; line-height:1.8; }.notes-stream { max-width:760px; margin:0 auto; padding-top:42px; }.note-card { padding:28px 0 34px; border-bottom:1px solid var(--line); scroll-margin-top:30px; }.note-card:target { padding-left:20px; border-left:2px solid var(--cyan); background:rgba(98,220,232,.03); }.note-card header { display:flex; align-items:center; gap:11px; margin-bottom:20px; color:var(--faint); font:.62rem 'DM Mono',monospace; }.note-mark { color:var(--cyan); }.note-body { color:#cbd3e8; font-size:1.08rem; line-height:1.85; }.note-body p { margin:0 0 14px; }.note-body p:last-child { margin-bottom:0; }.note-body a { color:var(--cyan); text-decoration:underline; text-underline-offset:3px; }.note-body code { color:var(--cyan); }.empty-state { color:var(--muted); font:.75rem 'DM Mono',monospace; }
+	@media(max-width:700px) { .notes-page { padding-top:58px; }.notes-header { align-items:start; flex-direction:column; gap:28px; }.notes-intro { max-width:520px; } }
+</style>

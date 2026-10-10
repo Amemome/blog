@@ -1,4 +1,4 @@
-import { copyFile } from 'node:fs/promises';
+import { cp } from 'node:fs/promises';
 import path from 'node:path';
 import { db } from '../../../lib/server/db';
 import { json, requireSession, route } from '../../../lib/server/http';
@@ -10,6 +10,8 @@ export const POST = route(async (context) => {
 	await ensureStorageDirectories();
 	const stamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
 	const destination = path.join(backupDirectory, `blog-${stamp}.sqlite`);
+	const mediaDestination = path.join(backupDirectory, `media-${stamp}`);
 	await db.backup(destination);
-	return json({ backedUp: true, database: destination, mediaDirectory });
+	await cp(mediaDirectory, mediaDestination, { recursive: true, force: true });
+	return json({ backedUp: true, database: destination, media: mediaDestination });
 });

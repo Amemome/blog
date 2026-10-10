@@ -1,195 +1,72 @@
 # Blog Architecture
 
-## 1. Goals
-
-- Keep personal memo content in Oracle Cloud.
-- Keep the public reading experience fast and mostly static.
-- Use the smallest operational setup that fits a single reader and writer.
-- Make backups and recovery explicit because SQLite is the source of truth.
-
-## 2. High-level architecture
+## 현재 구조
 
 ```text
-                         publish webhook
-                              |
-                              v
-Reader -> Astro static site -> Strapi REST API (published content only)
-              ^                         ^
-              |                         |
-      CI build/deploy        Protected admin UI + API auth
-                                        |
-                                  SQLite volume
-                                        |
-                                OCI backup storage
+Reader -> Astro Node SSR -> SQLite (published rows only)
+                         ^
+                 protected admin UI/API
+                         ^
+                    Nginx / HTTPS
+                         ^
+                    SQLite/media backup
 ```
 
-### Runtime components
+| 구성 | 역할 |
+| --- | --- |
+| Astro + `@astrojs/node` | 공개 페이지, 관리자 페이지, API를 제공하는 SSR 서버 |
+| SQLite + better-sqlite3 | 글·카테고리·revision·세션의 source of truth |
+| `data/media` | 인증된 업로드가 저장되는 미디어 디렉터리 |
+| Nginx | HTTPS 종료와 localhost Node 서버 reverse proxy |
+| systemd timer | SQLite와 미디어의 일일 백업 실행 |
 
-| Component | Responsibility | Initial deployment |
-| --- | --- | --- |
-| Astro | Renders posts, categories, tags, search UI, and static pages | Static output behind Caddy/Nginx |
-| Strapi | Admin UI, draft/publish workflow, content API | Private OCI VM/container |
-| SQLite | Strapi database and source of truth | Persistent OCI block volume |
-| Caddy or Nginx | TLS termination and reverse proxy | Same OCI VM |
-| CI/CD | Builds Astro and deploys the generated site | GitHub Actions or equivalent |
-| OCI Object Storage | Off-host backups of SQLite and media | Scheduled backup target |
+외부 CMS, Strapi, CI/CD, webhook은 현재 런타임 경로에 포함되지 않습니다.
 
-The first version should use one OCI VM and Docker Compose. This keeps the deployment understandable and avoids introducing Kubernetes or a second database before the workload needs it.
+## 공개 영역
 
-## 2.1 Product scope
+- `/blog/`는 `status = 'published'`인 글만 읽습니다.
+- `/blog/[slug]`, `/rss.xml`, `/sitemap.xml`도 게시된 글만 노출합니다.
+- `/notes/`와 `/api/notes`도 `published` 노트만 공개합니다.
+- 검색은 공개 archive에 이미 렌더링된 게시된 글을 대상으로 합니다.
+- 초안·비공개·삭제 글과 write API는 공개 화면에서 접근할 수 없습니다.
 
-The blog has two distinct areas:
+## 관리자 영역
 
-- **Public reading area**: the `/blog/` archive, published post detail pages, category navigation, tags, and search. It must not expose drafts or write APIs.
-- **Admin area**: a protected page where the owner can create and edit posts, create/edit/delete categories and tags, add a category directly from the writing form, assign categories, save drafts, preview, publish, schedule, unpublish, restore revisions, and delete content.
+`/admin/`은 세션 쿠키로 보호되며, 모든 private API는 서버에서 세션을 다시 확인합니다. 상태 변경 요청에는 double-submit CSRF 토큰이 필요합니다.
 
-The `/blog/` archive is the single public space for browsing posts. It should include a distinctive category selector with a clear active state, useful empty states, and a layout that supports scanning many posts. Category changes should filter the archive in place or through a query parameter; do not create a separate `/categories/` route.
+게시글 상태는 다음 네 가지입니다.
 
-The first authoring editor should use Markdown as the canonical body format. While writing, the admin page must render the Markdown result in a Notion-like editor or split preview so headings, emphasis, links, lists, code, and quotes are visible before publishing. Existing posts must be editable from the admin page without losing their current metadata unless the author changes it. Keeping Markdown canonical makes exports, revisions, backups, and future migrations portable.
+- `draft`: 임시저장 및 자동저장 상태
+- `published`: 공개 영역에 게시된 상태
+- `unpublished`: 게시 이력이 있지만 공개하지 않는 상태
+- `deleted`: soft delete 상태
 
-The admin area is an authoring interface, not a second public-facing blog. Authentication identifies the owner, and authorization must be checked again by the CMS API for every read of private content and every mutation. A hidden URL is not an access control mechanism.
+예약발행은 의도적으로 제거했습니다. 기존 데이터베이스에 남은 `scheduled` row는 시작 시 `draft`로 변환됩니다.
 
-### Current implementation milestone
+## 데이터 모델
 
-The Astro server currently implements the public `/blog/` archive, category/tag filtering, client-side search, post detail pages, related-post links, and a server-authorized `/admin/` writing workflow. The editor supports Markdown preview, autosave, revision restore, publishing states, scheduling metadata, media upload, and inline category creation. SQLite is the local source of truth and all private mutations are protected by session and CSRF checks.
+- `posts`: 제목, slug, excerpt, Markdown body, category, tags, 상태, cover/social metadata
+- `notes`: 짧은 Markdown body, 상태, 작성·수정 시각
+- `categories`: 이름, slug, accent
+- `post_revisions`: 게시글별 metadata와 Markdown snapshot
+- `sessions`: hash된 session token과 CSRF token
+- `auth_events`: 로그인·로그아웃·게시 이벤트
+- `login_attempts`: 로그인 실패 rate limit 상태
 
-Production integration still needs an external scheduler, encrypted off-host backup runner, HTTPS reverse proxy, and deployment webhook. The public site continues to query only published records.
+모든 public content는 DB 조회 직전에 게시 상태로 제한됩니다. Markdown HTML은 `sanitize-html`로 정리합니다.
 
-## 3. Request and publishing flows
+## 미디어와 백업
 
-### Reading a post
+인증된 `/api/media` 업로드는 JPEG·PNG·WebP만 허용하고 `sharp`로 실제 이미지 형식을 확인합니다. 원본은 최대 2400px로 최적화되며 768px·1536px 변형이 생성됩니다.
 
-1. A reader requests the Astro site.
-2. The static site serves the page directly from the web server or CDN.
-3. During a build, Astro fetches only published entries from Strapi's public API.
-4. Drafts and admin endpoints are never included in the public build.
+`scripts/backup.sh`는 SQLite online backup과 미디어 tar를 생성합니다. 기본 보존은 일일 14일, 주간 8주이며 `BACKUP_GPG_RECIPIENT`로 암호화할 수 있습니다. `BACKUP_REMOTE_DIR`를 설정하면 생성된 백업을 별도 마운트나 외부 동기화 경로로 복제합니다.
 
-### Publishing a post
+복원 절차는 [`OPERATIONS.md`](OPERATIONS.md)에 기록합니다. 운영자는 분기마다 임시 `DATABASE_PATH`와 `MEDIA_DIR`로 복원을 확인해야 합니다. JSON export에는 게시글과 노트가 모두 포함됩니다.
 
-1. The author opens the protected admin page and authenticates.
-2. The author creates or edits a post, selects a category, optionally adds tags, and saves a draft.
-3. The author publishes the draft after reviewing it, or unpublishes it to remove it from the public site.
-4. Strapi sends a signed webhook to CI/CD after a publish-state change.
-5. CI/CD runs the Astro build against the Strapi API and deploys the generated output.
-6. The old static site remains available until the new deployment is healthy.
-
-If webhook-driven builds are unavailable initially, a manual build/deploy command is an acceptable first milestone. The public site must not query draft content at runtime.
-
-## 4. Content model
-
-Start with a deliberately small model:
-
-- `Post`: title, slug, excerpt, Markdown body, cover image (optional), category, tags, status, published date, updated date.
-- `Category`: name, slug, description (optional), display order (optional), visual accent (optional).
-- `Tag`: name, slug.
-- `Media`: original file, optimized variants, alt text, dimensions, and storage key.
-- `PostRevision`: post reference, Markdown body, metadata snapshot, author, and created date.
-- `Post` to `Category`: many-to-one relation; every published post must have one primary category.
-- `Post` to `Tag`: many-to-many relation.
-- `Post` to `PostRevision`: one-to-many relation for recovery and restore.
-
-Strapi's draft/publish feature controls visibility. Astro should validate the response shape at the API boundary and render an explicit not-found page when a slug is missing or unpublished. The `/blog/` archive should display published posts only and handle an unknown category filter without exposing private content.
-
-The planned routes are:
-
-- `/`: landing page and recent highlights.
-- `/blog/`: multi-post archive with the category selector and filtering.
-- `/blog/[slug]`: published post detail reached from the archive.
-- `/rss.xml`: published-post RSS feed.
-- `/sitemap-index.xml`: sitemap for public pages.
-- `/admin`: authenticated authoring UI; never included in the public static build.
-- `/admin/preview/[id]`: authenticated draft preview, never exposed to public readers or the static build.
-
-## 5. Security boundaries
-
-- Keep the admin UI, Strapi Admin, and private Strapi API behind HTTPS, an allowlist, VPN, or an additional access layer.
-- Require strong authentication for the admin area and use secure, HttpOnly, SameSite session cookies or an equivalent server-managed session.
-- Enforce authorization on the server for post creation, editing, deletion, draft access, category/tag creation, editing and deletion, and publish/unpublish operations.
-- Require authorization for previews, media uploads, revision access, scheduled publishing, exports, and backup/restore operations.
-- Use a single-owner role initially; do not assume that frontend route protection is sufficient authorization.
-- Expose only the minimum read permissions required for published posts.
-- Do not put Strapi admin tokens, session secrets, webhook secrets, or OCI credentials in Astro client code.
-- Store secrets in CI/CD secrets and the server's protected environment, never in Git.
-- Use separate read-only build credentials if the API cannot be public.
-- Restrict the VM firewall to SSH from a trusted source and HTTPS from the internet.
-- Disable public access to SQLite and uploaded media directories.
-- Add CSRF protection to state-changing admin requests when cookie-based sessions are used, and rate-limit authentication endpoints.
-- Record authentication and publishing activity without storing unnecessary personal data.
-
-The frontend should be treated as public even if the content is personally written. If the entire blog must be private, add authentication at the reverse proxy or identity layer; do not rely on hiding Strapi endpoints.
-
-## 6. Data and backup plan
-
-SQLite is a good fit for the initial single-node workload, but it requires operational discipline:
-
-- Put the database file and Strapi uploads on a persistent OCI block volume.
-- Back up with SQLite's online backup mechanism or a Strapi-aware stop/backup window; do not copy a live database file blindly.
-- Encrypt backups and keep at least one copy outside the VM in OCI Object Storage.
-- Retain daily backups for 14 days and a weekly backup for 8 weeks.
-- Periodically restore a backup into a disposable Strapi instance.
-- Record the Strapi version, Node version, schema changes, and restore steps.
-- Export posts, categories, tags, and metadata as JSON for a provider-independent recovery path.
-- Include uploaded media in backup coverage and verify that optimized variants can be regenerated.
-
-SQLite should remain single-writer and single-node. Move to PostgreSQL only when concurrent writes, multiple application instances, or operational limits make that tradeoff worthwhile.
-
-## 7. Repository shape
-
-The repository can grow into this structure without coupling the frontend to Strapi internals:
+## 배포
 
 ```text
-blog/
-├── apps/
-│   ├── web/                 # Astro frontend
-│   └── cms/                 # Strapi application
-├── infra/
-│   ├── compose.yaml         # Local/OCI service wiring
-│   ├── Caddyfile            # TLS and reverse proxy rules
-│   └── backup/              # Backup and restore scripts
-├── packages/
-│   └── content-contract/    # Shared API types/schema, if needed
-├── .github/workflows/
-│   └── deploy-web.yml
-└── ARCHITECTURE.md
+Internet -> Nginx :443 -> 127.0.0.1:4321 -> Astro standalone -> SQLite/media
 ```
 
-Keep Strapi-generated files inside `apps/cms`. The Astro app should consume a small typed content client rather than importing CMS-specific models throughout page components.
-
-## 8. Development environments
-
-### Local
-
-- Run Astro and Strapi independently with environment files that are ignored by Git.
-- Use a local SQLite file for Strapi.
-- Use seeded example posts; never copy private production content into the repository.
-- Point Astro at the local Strapi URL through an environment variable.
-
-### Production
-
-- Run Strapi and the reverse proxy on the OCI VM with Docker Compose.
-- Mount SQLite and uploads from persistent storage.
-- Build Astro in CI and deploy immutable static output.
-- Run migrations or Strapi upgrades only after a verified backup.
-
-## 9. Delivery milestones
-
-1. Create `apps/web` and `apps/cms` with pinned Node and package-manager versions.
-2. Define the Post, Category, and Tag content types and verify draft/publish behavior.
-3. Build the Astro content client, `/blog/` multi-post archive, `/blog/[slug]` detail page, distinctive category selector, and 404 page.
-4. Build the protected admin page and authoring workflow for post create, edit, draft, publish, unpublish, and delete.
-5. Add category and tag CRUD to the protected admin workflow.
-6. Add Markdown preview, autosave, revision restore, scheduling, reading-time calculation, and media management.
-7. Add authentication, server-side authorization, CSRF protection, rate limiting, and activity logging for the admin workflow.
-8. Add search, related posts, RSS, sitemap, SEO metadata, accessibility states, and responsive behavior.
-9. Add local Compose wiring and environment variable validation.
-10. Add CI build checks, publish/build status, and a manual static deployment.
-11. Add the publish webhook, OCI reverse proxy, HTTPS, and firewall rules.
-12. Add scheduled encrypted backups, JSON export, media backup, and perform a restore drill.
-
-## 10. Decisions to revisit
-
-- Whether the public site also needs authentication; the admin area requires authentication regardless.
-- Whether analytics are needed; default to no tracking until there is a clear use case.
-- Whether images should remain on the VM or move to OCI Object Storage.
-- Whether build-time publishing latency is acceptable; if not, consider Astro SSR.
-- Whether SQLite remains suitable before adding any second application instance.
+운영 서비스 파일은 [`deploy/blog.service`](deploy/blog.service), 백업 timer는 [`deploy/blog-backup.timer`](deploy/blog-backup.timer)에 있습니다. 배포 여부는 외부 CI 상태가 아니라 관리자 게시글 상태로 관리합니다.

@@ -6,7 +6,7 @@ export const renderMarkdown = (source: string) => sanitizeHtml(String(marked.par
 	allowedAttributes: {
 		...sanitizeHtml.defaults.allowedAttributes,
 		a: ['href', 'name', 'target', 'rel'],
-		img: ['src', 'alt', 'width', 'height'],
+		img: ['src', 'srcset', 'sizes', 'alt', 'width', 'height', 'loading'],
 		code: ['class'],
 	},
 	allowedSchemes: ['http', 'https', 'mailto'],

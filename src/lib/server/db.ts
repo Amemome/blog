@@ -29,9 +29,15 @@ db.exec(`
 		cover_url TEXT,
 		social_title TEXT,
 		social_description TEXT,
-		status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'unpublished', 'scheduled', 'deleted')),
+		status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'unpublished', 'deleted')),
 		published_at TEXT,
-		scheduled_at TEXT,
+		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE TABLE IF NOT EXISTS notes (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		body TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'unpublished', 'deleted')),
 		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -63,9 +69,12 @@ db.exec(`
 
 const columns = db.prepare('PRAGMA table_info(posts)').all() as { name: string }[];
 const existingColumns = new Set(columns.map((column) => column.name));
-for (const [name, definition] of [['cover_url', 'TEXT'], ['social_title', 'TEXT'], ['social_description', 'TEXT'], ['scheduled_at', 'TEXT']] as const) {
+for (const [name, definition] of [['cover_url', 'TEXT'], ['social_title', 'TEXT'], ['social_description', 'TEXT']] as const) {
 	if (!existingColumns.has(name)) db.exec(`ALTER TABLE posts ADD COLUMN ${name} ${definition}`);
 }
+
+// 예약발행 제거 후 남아 있는 예약 글은 공개되지 않는 초안으로 보존한다.
+	db.prepare("UPDATE posts SET status = 'draft' WHERE status = 'scheduled'").run();
 
 const categoryCount = db.prepare('SELECT COUNT(*) AS count FROM categories').get() as { count: number };
 if (categoryCount.count === 0) {
@@ -81,7 +90,8 @@ if (postCount.count === 0) {
 	seed();
 }
 
-export type PostStatus = 'draft' | 'published' | 'unpublished' | 'scheduled' | 'deleted';
+export type PostStatus = 'draft' | 'published' | 'unpublished' | 'deleted';
+export type NoteStatus = 'draft' | 'published' | 'unpublished' | 'deleted';
 export type PostRecord = {
 	id: number;
 	title: string;
@@ -97,10 +107,26 @@ export type PostRecord = {
 	cover_url: string | null;
 	social_title: string | null;
 	social_description: string | null;
-	scheduled_at: string | null;
+};
+
+export type NoteRecord = {
+	id: number;
+	body: string;
+	status: NoteStatus;
+	created_at: string;
+	updated_at: string;
 };
 
 export const serializePost = (post: PostRecord) => ({
 	...post,
-	tags: JSON.parse(post.tags) as string[],
+	tags: (() => {
+		try {
+			const parsed = JSON.parse(post.tags);
+			return Array.isArray(parsed) ? parsed.filter((tag): tag is string => typeof tag === 'string') : [];
+		} catch {
+			return [];
+		}
+	})(),
 });
+
+export const serializeNote = (note: NoteRecord) => ({ ...note });

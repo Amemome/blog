@@ -1,0 +1,107 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="ADMIN / NOTES / ORBITAL NOTES" description="Orbital Notes 빠른 생각 작성 공간.">
+	<section class="quick-editor shell" aria-labelledby="quick-editor-heading">
+		<header class="quick-editor-header">
+			<div>
+				<p class="eyebrow"><span>06</span> quick authoring</p>
+				<h1 id="quick-editor-heading">생각을 바로<br /><em>궤도에 던집니다.</em></h1>
+			</div>
+			<a class="back-link" href="/admin/">긴 글 편집기로 돌아가기 ↗</a>
+		</header>
+		<form id="note-form" class="note-form">
+			<label for="note-body" class="sr-only">짧은 생각</label>
+			<textarea id="note-body" maxlength="2000" placeholder="지금 떠오른 생각을 적어보세요. Markdown도 사용할 수 있습니다." required></textarea>
+			<div class="note-form-footer"><span id="character-count">0 / 2000</span><div><button class="button secondary" type="button" id="save-note">임시저장</button><button class="button primary" type="button" id="publish-note">게시 ↗</button></div></div>
+			<p id="note-status" class="note-status" role="status" aria-live="polite"></p>
+		</form>
+		<section class="note-registry" aria-labelledby="registry-heading"><div class="registry-heading"><div><p class="eyebrow"><span>07</span> thought registry</p><h2 id="registry-heading">남긴 생각</h2></div><button class="button secondary" type="button" id="refresh-notes">새로고침</button></div><div id="note-list" class="note-list"><p class="loading">불러오는 중...</p></div></section>
+	</section>
+</BaseLayout>
+
+<script>
+	type Note = { id: number; body: string; status: string; created_at: string; updated_at: string };
+	const form = document.querySelector<HTMLFormElement>('#note-form');
+	const body = document.querySelector<HTMLTextAreaElement>('#note-body');
+	const count = document.querySelector<HTMLElement>('#character-count');
+	const statusMessage = document.querySelector<HTMLElement>('#note-status');
+	const noteList = document.querySelector<HTMLElement>('#note-list');
+	const csrf = () => document.cookie.split('; ').find((cookie) => cookie.startsWith('blog_csrf='))?.split('=')[1] || '';
+	const statusLabels: Record<string, string> = { draft: '임시저장', published: '게시됨', unpublished: '비공개', deleted: '삭제됨' };
+	let notes: Note[] = [];
+
+	const setMessage = (message: string, error = false) => {
+		if (statusMessage) {
+			statusMessage.textContent = message;
+			statusMessage.dataset.error = error ? 'true' : 'false';
+		}
+	};
+	const escapeHtml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+	const renderNotes = () => {
+		if (!noteList) return;
+		noteList.replaceChildren();
+		if (!notes.length) {
+			const empty = document.createElement('p');
+			empty.className = 'loading';
+			empty.textContent = '아직 남긴 생각이 없습니다.';
+			noteList.append(empty);
+			return;
+		}
+		notes.forEach((note) => {
+			const item = document.createElement('article');
+			item.className = 'note-row';
+			item.innerHTML = `<div><div class="note-row-meta"><span class="status-pill ${escapeHtml(note.status)}">${escapeHtml(statusLabels[note.status] || note.status)}</span><time>${escapeHtml(note.created_at.slice(0, 16).replace('T', ' '))}</time></div><p>${escapeHtml(note.body)}</p></div><div class="note-row-actions">${note.status !== 'published' && note.status !== 'deleted' ? `<button type="button" data-action="publish" data-id="${note.id}">게시</button>` : ''}${note.status === 'published' ? `<button type="button" data-action="unpublish" data-id="${note.id}">비공개</button>` : ''}${note.status !== 'deleted' ? `<button type="button" data-action="delete" data-id="${note.id}">삭제</button>` : ''}</div>`;
+			noteList.append(item);
+		});
+	};
+	const loadNotes = async () => {
+		const response = await fetch('/api/notes?includeDrafts=true', { credentials: 'include' });
+		if (!response.ok) throw new Error('notes_unavailable');
+		notes = (await response.json() as { notes: Note[] }).notes;
+		renderNotes();
+	};
+	const saveNote = async (nextStatus: string) => {
+		const text = body?.value.trim() || '';
+		if (!text) return setMessage('생각을 먼저 적어주세요.', true);
+		const response = await fetch('/api/notes', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': csrf() }, body: JSON.stringify({ body: text, status: nextStatus }) });
+		if (!response.ok) return setMessage('저장하지 못했습니다.', true);
+		if (body) body.value = '';
+		if (count) count.textContent = '0 / 2000';
+		setMessage(nextStatus === 'published' ? '게시했습니다.' : '임시저장했습니다.');
+		await loadNotes();
+	};
+	const updateNote = async (id: number, nextStatus: string) => {
+		const response = await fetch(`/api/notes/${id}`, { method: 'PUT', credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': csrf() }, body: JSON.stringify({ status: nextStatus }) });
+		if (!response.ok) return setMessage('상태를 바꾸지 못했습니다.', true);
+		setMessage('상태를 변경했습니다.');
+		await loadNotes();
+	};
+	const deleteNote = async (id: number) => {
+		if (!window.confirm('이 짧은 생각을 삭제할까요?')) return;
+		const response = await fetch(`/api/notes/${id}`, { method: 'DELETE', credentials: 'include', headers: { 'x-csrf-token': csrf() } });
+		if (!response.ok) return setMessage('삭제하지 못했습니다.', true);
+		setMessage('삭제했습니다.');
+		await loadNotes();
+	};
+	body?.addEventListener('input', () => { if (count) count.textContent = `${body.value.length} / 2000`; });
+	document.querySelector<HTMLButtonElement>('#save-note')?.addEventListener('click', () => void saveNote('draft'));
+	document.querySelector<HTMLButtonElement>('#publish-note')?.addEventListener('click', () => void saveNote('published'));
+	document.querySelector<HTMLButtonElement>('#refresh-notes')?.addEventListener('click', () => void loadNotes());
+	noteList?.addEventListener('click', (event) => {
+		const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
+		if (!button) return;
+		const id = Number(button.dataset.id);
+		if (button.dataset.action === 'delete') void deleteNote(id);
+		else if (button.dataset.action === 'publish') void updateNote(id, 'published');
+		else if (button.dataset.action === 'unpublish') void updateNote(id, 'unpublished');
+	});
+	form?.addEventListener('submit', (event) => event.preventDefault());
+	void loadNotes().catch(() => setMessage('노트를 불러오지 못했습니다.', true));
+</script>
+
+<style>
+	.quick-editor { padding:82px 0 120px; }.quick-editor-header { display:flex; justify-content:space-between; align-items:end; gap:30px; padding-bottom:55px; }.eyebrow { margin:0 0 22px; color:var(--muted); font:.65rem 'DM Mono',monospace; letter-spacing:.1em; text-transform:uppercase; }.eyebrow span { margin-right:13px; color:var(--cyan); }.quick-editor h1 { margin:0; font-size:clamp(2.7rem,6vw,5.4rem); line-height:.96; letter-spacing:-.07em; font-weight:500; }.quick-editor h1 em { color:var(--violet); font-style:normal; }.back-link { color:var(--cyan); font:.65rem 'DM Mono',monospace; }.note-form { padding:20px; border:1px solid var(--line); background:rgba(13,17,36,.7); }.note-form textarea { display:block; width:100%; min-height:180px; padding:16px; resize:vertical; color:var(--ink); border:1px solid var(--line); outline:0; background:rgba(8,10,22,.55); font:1.05rem/1.8 'Space Grotesk',sans-serif; }.note-form textarea:focus { border-color:var(--cyan); }.note-form-footer { display:flex; justify-content:space-between; align-items:center; gap:20px; padding-top:15px; color:var(--faint); font:.62rem 'DM Mono',monospace; }.button { padding:10px 15px; border:1px solid var(--line); border-radius:2px; color:var(--ink); font:.65rem 'DM Mono',monospace; cursor:pointer; }.button + .button { margin-left:8px; }.button.secondary { background:transparent; }.button.primary { border-color:var(--cyan); background:rgba(98,220,232,.1); }.note-status { min-height:1.2em; margin:15px 0 0; color:var(--cyan); font:.68rem 'DM Mono',monospace; }.note-status[data-error="true"] { color:#ef8b9d; }.note-registry { margin-top:80px; }.registry-heading { display:flex; justify-content:space-between; align-items:end; margin-bottom:25px; }.registry-heading h2 { margin:0; font-size:2rem; font-weight:500; }.note-list { border-top:1px solid var(--line); }.note-row { display:grid; grid-template-columns:1fr auto; gap:25px; padding:22px 0; border-bottom:1px solid var(--line); }.note-row-meta { display:flex; align-items:center; gap:12px; color:var(--faint); font:.6rem 'DM Mono',monospace; }.note-row p { max-width:700px; margin:12px 0 0; color:#c0c9e1; white-space:pre-wrap; line-height:1.65; }.status-pill { padding:4px 7px; color:var(--amber); border:1px solid rgba(239,187,117,.38); }.status-pill.published { color:var(--cyan); border-color:rgba(98,220,232,.4); }.status-pill.unpublished,.status-pill.deleted { color:#ef8b9d; border-color:rgba(239,139,157,.4); }.note-row-actions { display:flex; align-items:center; gap:8px; }.note-row-actions button { padding:7px 9px; color:var(--muted); border:1px solid var(--line); background:transparent; font:.6rem 'DM Mono',monospace; cursor:pointer; }.note-row-actions button:hover { color:var(--cyan); border-color:var(--cyan); }.loading { color:var(--muted); font:.7rem 'DM Mono',monospace; }
+	@media(max-width:650px) { .quick-editor { padding-top:55px; }.quick-editor-header { align-items:start; flex-direction:column; gap:25px; }.note-form-footer { align-items:stretch; flex-direction:column; }.note-form-footer > div { display:flex; }.note-form-footer .button { flex:1; }.note-row { grid-template-columns:1fr; gap:15px; }.note-row-actions { justify-content:flex-start; } }
+</style>

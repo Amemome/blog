@@ -1,0 +1,8 @@
+[Unit]
+Description=Orbital Notes SQLite and media backup
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/var/www/blog
+ExecStart=/var/www/blog/scripts/backup.sh

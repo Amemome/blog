@@ -1,6 +1,10 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { resolve } from 'node:path';
+import { config } from 'dotenv';
 import type { APIContext } from 'astro';
 import { db } from './db';
+
+config({ path: resolve(process.cwd(), '.env'), override: true });
 
 const sessionCookie = 'blog_session';
 const csrfCookie = 'blog_csrf';
@@ -8,8 +12,9 @@ const sessionLifetimeSeconds = 60 * 60 * 8;
 
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 const passwordMatches = (password: string) => {
-	const expected = import.meta.env.ADMIN_PASSWORD_HASH;
-	if (!expected) return Boolean(import.meta.env.ADMIN_PASSWORD && password === import.meta.env.ADMIN_PASSWORD);
+	const expected = process.env.ADMIN_PASSWORD_HASH;
+	const configuredPassword = process.env.ADMIN_PASSWORD;
+	if (!expected) return Boolean(configuredPassword && password === configuredPassword);
 	const [salt, digest] = expected.split('$');
 	if (!salt || !digest) return false;
 	const actual = scryptSync(password, salt, 64).toString('hex');
@@ -25,6 +30,11 @@ export const getSession = (context: APIContext) => {
 };
 
 export const authenticate = (password: string) => passwordMatches(password);
+
+export const syncCsrfCookie = (context: APIContext, csrfToken: string) => {
+	const secure = import.meta.env.PROD;
+	context.cookies.set(csrfCookie, csrfToken, { httpOnly: false, sameSite: 'lax', secure, path: '/', maxAge: sessionLifetimeSeconds });
+};
 
 const loginWindowMs = 15 * 60 * 1000;
 const maxFailedAttempts = 5;
@@ -65,7 +75,7 @@ export const createSession = (context: APIContext) => {
 	db.prepare('INSERT INTO sessions (token_hash, csrf_token, expires_at) VALUES (?, ?, ?)').run(hash(token), csrfToken, expiresAt);
 	const secure = import.meta.env.PROD;
 	context.cookies.set(sessionCookie, token, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: sessionLifetimeSeconds });
-	context.cookies.set(csrfCookie, csrfToken, { httpOnly: false, sameSite: 'lax', secure, path: '/', maxAge: sessionLifetimeSeconds });
+	syncCsrfCookie(context, csrfToken);
 	return { expiresAt };
 };
 

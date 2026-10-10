@@ -22,7 +22,7 @@ export const POST = route(async (context) => {
 	const snapshot = JSON.parse(revision.snapshot) as ReturnType<typeof serializePost>;
 	db.transaction(() => {
 		db.prepare('INSERT INTO post_revisions (post_id, snapshot) VALUES (?, ?)').run(post.id, JSON.stringify(serializePost(post)));
-		db.prepare(`UPDATE posts SET title = ?, slug = ?, excerpt = ?, body = ?, category_slug = ?, tags = ?, cover_url = ?, social_title = ?, social_description = ?, status = ?, published_at = ?, scheduled_at = ?, updated_at = ? WHERE id = ?`).run(snapshot.title, snapshot.slug, snapshot.excerpt, snapshot.body ?? snapshot.content.join('\n\n'), snapshot.category_slug ?? snapshot.category, JSON.stringify(snapshot.tags), snapshot.cover_url ?? null, snapshot.social_title ?? null, snapshot.social_description ?? null, snapshot.status, snapshot.published_at ?? null, snapshot.scheduled_at ?? null, new Date().toISOString(), post.id);
+		db.prepare(`UPDATE posts SET title = ?, slug = ?, excerpt = ?, body = ?, category_slug = ?, tags = ?, cover_url = ?, social_title = ?, social_description = ?, status = ?, published_at = ?, updated_at = ? WHERE id = ?`).run(snapshot.title, snapshot.slug, snapshot.excerpt, snapshot.body ?? snapshot.content.join('\n\n'), snapshot.category_slug ?? snapshot.category, JSON.stringify(snapshot.tags), snapshot.cover_url ?? null, snapshot.social_title ?? null, snapshot.social_description ?? null, snapshot.status, snapshot.published_at ?? null, new Date().toISOString(), post.id);
 	})();
 	return json({ restored: true });
 });

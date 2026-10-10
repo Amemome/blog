@@ -27,7 +27,7 @@ const editSlug = Astro.url.searchParams.get('edit');
 		<form class="auth-form" id="login-form"><label class="field"><span class="field-label">ACCESS PASSWORD</span><input id="login-password" type="password" autocomplete="current-password" required /></label><button class="button primary" type="submit">unlock ↗</button><p class="auth-error" id="auth-error" role="alert" hidden>패스워드가 올바르지 않습니다.</p></form>
 	</section>
 
-	<nav class="admin-nav shell requires-auth" id="admin-nav" aria-label="관리자 메뉴" hidden><button class="admin-tab active" type="button" data-admin-view="write">write <span>새 글</span></button><button class="admin-tab" type="button" data-admin-view="posts">posts <span id="post-count">0</span></button></nav>
+	<nav class="admin-nav shell requires-auth" id="admin-nav" aria-label="관리자 메뉴" hidden><button class="admin-tab active" type="button" data-admin-view="write">write <span>새 글</span></button><button class="admin-tab" type="button" data-admin-view="posts">posts <span id="post-count">0</span></button><a class="admin-tab admin-link" href="/admin/notes/">quick notes <span>짧은 생각</span></a></nav>
 
 	<section class="editor-shell shell requires-auth" id="editor-shell" aria-label="글 작성 편집기" hidden>
 		<form class="editor-form" id="editor-form">
@@ -41,8 +41,7 @@ const editSlug = Astro.url.searchParams.get('edit');
 				<div class="field category-field"><span class="field-label">CATEGORY</span><div class="category-control"><select id="category" name="category" required>{categories.map((category) => <option value={category.slug}>{category.name}</option>)}</select><button class="add-category" id="show-category-form" type="button" aria-label="카테고리 추가">+ add</button><button class="add-category" id="edit-category" type="button" aria-label="카테고리 수정">edit</button><button class="add-category" id="delete-category" type="button" aria-label="카테고리 삭제">delete</button></div><div class="category-form" id="category-form" hidden><input id="new-category" type="text" placeholder="새 카테고리 이름" /><button class="add-category confirm" id="add-category" type="button">추가</button></div></div>
 				<label class="field"><span class="field-label">SLUG</span><input id="slug" name="slug" type="text" placeholder="post-slug" required /></label>
 				<label class="field field-excerpt"><span class="field-label">EXCERPT</span><input id="excerpt" name="excerpt" type="text" placeholder="목록에 표시될 짧은 설명" /></label>
-				<label class="field"><span class="field-label">STATUS</span><select id="post-status"><option value="draft">draft</option><option value="published">published</option><option value="unpublished">unpublished</option><option value="scheduled">scheduled</option></select></label>
-				<label class="field"><span class="field-label">SCHEDULED AT</span><input id="scheduled-at" type="datetime-local" /></label>
+				<label class="field"><span class="field-label">STATUS</span><select id="post-status"><option value="draft">임시저장</option><option value="published">게시됨</option><option value="unpublished">비공개</option><option value="deleted">삭제됨</option></select></label>
 				<label class="field"><span class="field-label">TAGS</span><input id="tags" type="text" placeholder="design, notes" /></label>
 				<label class="field"><span class="field-label">COVER IMAGE</span><input id="cover-url" type="url" placeholder="/media/image.webp" /></label>
 				<label class="field"><span class="field-label">SOCIAL TITLE</span><input id="social-title" type="text" /></label>
@@ -59,8 +58,8 @@ const editSlug = Astro.url.searchParams.get('edit');
 
 	<section class="posts-shell shell requires-auth" id="posts-shell" aria-labelledby="posts-heading" hidden>
 		<div class="posts-heading"><div><p class="eyebrow"><span>05</span> content registry</p><h2 id="posts-heading">작성한 글</h2><p class="posts-lede">작성한 기록의 상태를 확인하고 다음 궤도로 옮깁니다.</p></div><div class="posts-heading-actions"><p class="posts-caption">drafts and published signals</p><button class="new-post-button" type="button" data-admin-view="write"><span>+</span> 새 기록</button></div></div>
-		<div class="posts-overview" aria-label="게시글 현황"><div><span class="overview-label">TOTAL NOTES</span><strong id="total-post-count">00</strong></div><div><span class="overview-label">PUBLISHED</span><strong id="published-post-count">00</strong></div><div><span class="overview-label">DRAFTS</span><strong id="draft-post-count">00</strong></div><div class="overview-signal"><span class="status-dot active"></span><span>registry synced</span></div></div>
-		<div class="registry-toolbar"><label class="registry-search"><span>⌕</span><span class="sr-only">글 검색</span><input id="managed-post-search" type="search" placeholder="제목, slug, 설명 검색" autocomplete="off" /></label><label class="registry-filter"><span class="field-label">VIEW</span><select id="managed-post-filter"><option value="all">all notes</option><option value="published">published</option><option value="draft">drafts</option><option value="scheduled">scheduled</option><option value="unpublished">unpublished</option></select></label></div>
+		<div class="posts-overview" aria-label="게시글 현황"><div><span class="overview-label">TOTAL NOTES</span><strong id="total-post-count">00</strong></div><div><span class="overview-label">PUBLISHED</span><strong id="published-post-count">00</strong></div><div><span class="overview-label">DRAFTS</span><strong id="draft-post-count">00</strong></div><div><span class="overview-label">UNPUBLISHED</span><strong id="unpublished-post-count">00</strong></div><div><span class="overview-label">DELETED</span><strong id="deleted-post-count">00</strong></div><div class="overview-signal"><span class="status-dot active"></span><span>registry synced</span></div></div>
+		<div class="registry-toolbar"><label class="registry-search"><span>⌕</span><span class="sr-only">글 검색</span><input id="managed-post-search" type="search" placeholder="제목, slug, 설명 검색" autocomplete="off" /></label><label class="registry-filter"><span class="field-label">VIEW</span><select id="managed-post-filter"><option value="all">전체 글</option><option value="published">게시됨</option><option value="draft">임시저장</option><option value="unpublished">비공개</option><option value="deleted">삭제됨</option></select></label></div>
 		<div class="post-manager-list" id="post-manager-list"></div>
 	</section>
 
@@ -73,13 +72,13 @@ const editSlug = Astro.url.searchParams.get('edit');
 	import DOMPurify from 'dompurify';
 
 	type SeedPost = { slug: string; title: string; excerpt: string; category: string; date: string; content: string };
-	type EditablePost = Omit<SeedPost, 'date'> & { status: string; scheduledAt: string; tags: string[]; coverUrl: string; socialTitle: string; socialDescription: string };
+	type EditablePost = Omit<SeedPost, 'date'> & { status: string; tags: string[]; coverUrl: string; socialTitle: string; socialDescription: string };
 	type DraftPost = EditablePost;
 	type LocalCategory = { name: string; slug: string };
-	type ApiPost = { id: number; slug: string; title: string; excerpt: string; category_slug: string; body: string; status: string; updated_at: string; scheduled_at: string | null; tags: string[]; cover_url: string | null; social_title: string | null; social_description: string | null };
+	type ApiPost = { id: number; slug: string; title: string; excerpt: string; category_slug: string; body: string; status: string; updated_at: string; tags: string[]; cover_url: string | null; social_title: string | null; social_description: string | null };
 
 	const seedScript = document.querySelector<HTMLScriptElement>('#seed-posts');
-	const seedPosts: EditablePost[] = (JSON.parse(seedScript?.textContent || '[]') as SeedPost[]).map((post) => ({ ...post, status: 'published', scheduledAt: '', tags: [], coverUrl: '', socialTitle: '', socialDescription: '' }));
+	const seedPosts: EditablePost[] = (JSON.parse(seedScript?.textContent || '[]') as SeedPost[]).map((post) => ({ ...post, status: 'published', tags: [], coverUrl: '', socialTitle: '', socialDescription: '' }));
 	let serverPosts: EditablePost[] = [];
 	let managedPosts: ApiPost[] = [];
 	let loadedServerSlug: string | null = null;
@@ -99,7 +98,6 @@ const editSlug = Astro.url.searchParams.get('edit');
 	const excerpt = document.querySelector<HTMLInputElement>('#excerpt');
 	const content = document.querySelector<HTMLTextAreaElement>('#content');
 	const postStatus = document.querySelector<HTMLSelectElement>('#post-status');
-	const scheduledAt = document.querySelector<HTMLInputElement>('#scheduled-at');
 	const tags = document.querySelector<HTMLInputElement>('#tags');
 	const coverUrl = document.querySelector<HTMLInputElement>('#cover-url');
 	const socialTitle = document.querySelector<HTMLInputElement>('#social-title');
@@ -123,6 +121,8 @@ const editSlug = Astro.url.searchParams.get('edit');
 	const totalPostCount = document.querySelector<HTMLElement>('#total-post-count');
 	const publishedPostCount = document.querySelector<HTMLElement>('#published-post-count');
 	const draftPostCount = document.querySelector<HTMLElement>('#draft-post-count');
+	const unpublishedPostCount = document.querySelector<HTMLElement>('#unpublished-post-count');
+	const deletedPostCount = document.querySelector<HTMLElement>('#deleted-post-count');
 	const managedPostSearch = document.querySelector<HTMLInputElement>('#managed-post-search');
 	const managedPostFilter = document.querySelector<HTMLSelectElement>('#managed-post-filter');
 	const adminTabs = [...document.querySelectorAll<HTMLButtonElement>('[data-admin-view]')];
@@ -135,7 +135,8 @@ const editSlug = Astro.url.searchParams.get('edit');
 	const setStatus = (message: string, active = false) => {
 		if (status) status.innerHTML = `<span class="status-dot${active ? ' active' : ''}"></span>${message}`;
 	};
-	const currentPost = (): DraftPost => ({ slug: slug?.value.trim() || '', title: title?.value.trim() || '', excerpt: excerpt?.value.trim() || '', category: category?.value || '', content: content?.value || '', status: postStatus?.value || 'draft', scheduledAt: scheduledAt?.value || '', tags: (tags?.value || '').split(',').map((tag) => tag.trim()).filter(Boolean), coverUrl: coverUrl?.value.trim() || '', socialTitle: socialTitle?.value.trim() || '', socialDescription: socialDescription?.value.trim() || '' });
+	const currentPost = (): DraftPost => ({ slug: slug?.value.trim() || '', title: title?.value.trim() || '', excerpt: excerpt?.value.trim() || '', category: category?.value || '', content: content?.value || '', status: postStatus?.value || 'draft', tags: (tags?.value || '').split(',').map((tag) => tag.trim()).filter(Boolean), coverUrl: coverUrl?.value.trim() || '', socialTitle: socialTitle?.value.trim() || '', socialDescription: socialDescription?.value.trim() || '' });
+	const statusLabels: Record<string, string> = { draft: '임시저장', published: '게시됨', unpublished: '비공개', deleted: '삭제됨' };
 	const findPost = (postSlug: string) => (serverPosts.length ? serverPosts : seedPosts).find((post) => post.slug === postSlug);
 
 	function switchAdminView(view: string) {
@@ -159,6 +160,8 @@ const editSlug = Astro.url.searchParams.get('edit');
 		if (totalPostCount) totalPostCount.textContent = String(managedPosts.length).padStart(2, '0');
 		if (publishedPostCount) publishedPostCount.textContent = String(managedPosts.filter((post) => post.status === 'published').length).padStart(2, '0');
 		if (draftPostCount) draftPostCount.textContent = String(managedPosts.filter((post) => post.status === 'draft').length).padStart(2, '0');
+		if (unpublishedPostCount) unpublishedPostCount.textContent = String(managedPosts.filter((post) => post.status === 'unpublished').length).padStart(2, '0');
+		if (deletedPostCount) deletedPostCount.textContent = String(managedPosts.filter((post) => post.status === 'deleted').length).padStart(2, '0');
 		if (!visiblePosts.length) {
 			const empty = document.createElement('p');
 			empty.className = 'posts-empty';
@@ -174,7 +177,7 @@ const editSlug = Astro.url.searchParams.get('edit');
 			const safeExcerpt = escapeHtml(post.excerpt || '설명이 없습니다.');
 			const safeCategory = escapeHtml(post.category_slug);
 			const safeSlug = escapeHtml(post.slug);
-			item.innerHTML = `<span class="managed-index">${String(index + 1).padStart(2, '0')}</span><div class="managed-main"><div class="managed-meta"><span class="status-pill ${escapeHtml(post.status)}">${escapeHtml(post.status)}</span><span class="managed-category">${safeCategory}</span><span class="managed-updated">updated ${escapeHtml(post.updated_at.slice(0, 10))}</span></div><h3>${safeTitle}</h3><p>${safeExcerpt}</p><span class="managed-slug">/${safeSlug}</span></div><div class="managed-actions"><a class="managed-edit" href="/admin/?edit=${encodeURIComponent(post.slug)}"><span>↗</span> 편집</a><button class="managed-delete" type="button" data-delete-slug="${safeSlug}"><span>×</span> 삭제</button></div>`;
+			item.innerHTML = `<span class="managed-index">${String(index + 1).padStart(2, '0')}</span><div class="managed-main"><div class="managed-meta"><span class="status-pill ${escapeHtml(post.status)}">${escapeHtml(statusLabels[post.status] || post.status)}</span><span class="managed-category">${safeCategory}</span><span class="managed-updated">updated ${escapeHtml(post.updated_at.slice(0, 10))}</span></div><h3>${safeTitle}</h3><p>${safeExcerpt}</p><span class="managed-slug">/${safeSlug}</span></div><div class="managed-actions"><a class="managed-edit" href="/admin/?edit=${encodeURIComponent(post.slug)}"><span>↗</span> 편집</a>${post.status !== 'deleted' ? `<button class="managed-delete" type="button" data-delete-slug="${safeSlug}"><span>×</span> 삭제</button>` : ''}</div>`;
 			postManagerList.append(item);
 		});
 	}
@@ -185,7 +188,7 @@ const editSlug = Astro.url.searchParams.get('edit');
 	}
 
 	function loadPost(postSlug: string) {
-		const source = postSlug === 'new' ? { slug: '', title: '', excerpt: '', category: category?.options[0]?.value || '', content: '', status: 'draft', scheduledAt: '', tags: [], coverUrl: '', socialTitle: '', socialDescription: '' } : findPost(postSlug);
+		const source = postSlug === 'new' ? { slug: '', title: '', excerpt: '', category: category?.options[0]?.value || '', content: '', status: 'draft', tags: [], coverUrl: '', socialTitle: '', socialDescription: '' } : findPost(postSlug);
 		const saved = postSlug === 'new' ? null : getDrafts()[postSlug];
 		const next = saved || source;
 		if (!next) return;
@@ -196,7 +199,6 @@ const editSlug = Astro.url.searchParams.get('edit');
 		if (slug) slug.value = next.slug || '';
 		if (content) content.value = next.content || '';
 		if (postStatus) postStatus.value = next.status || 'draft';
-		if (scheduledAt) scheduledAt.value = next.scheduledAt || '';
 		if (tags) tags.value = next.tags?.join(', ') || '';
 		if (coverUrl) coverUrl.value = next.coverUrl || '';
 		if (socialTitle) socialTitle.value = next.socialTitle || '';
@@ -214,7 +216,7 @@ const editSlug = Astro.url.searchParams.get('edit');
 		const postData = await postsResponse.json() as { posts: ApiPost[] };
 		const categoryData = await categoriesResponse.json() as { categories: LocalCategory[] };
 		managedPosts = postData.posts;
-		serverPosts = managedPosts.map((post) => ({ slug: post.slug, title: post.title, excerpt: post.excerpt, category: post.category_slug, date: '', content: post.body, status: post.status, scheduledAt: post.scheduled_at || '', tags: post.tags, coverUrl: post.cover_url || '', socialTitle: post.social_title || '', socialDescription: post.social_description || '' }));
+		serverPosts = managedPosts.map((post) => ({ slug: post.slug, title: post.title, excerpt: post.excerpt, category: post.category_slug, date: '', content: post.body, status: post.status, tags: post.tags, coverUrl: post.cover_url || '', socialTitle: post.social_title || '', socialDescription: post.social_description || '' }));
 		if (category) {
 			category.replaceChildren(...categoryData.categories.map((item) => new Option(item.name, item.slug)));
 		}
@@ -244,7 +246,7 @@ const editSlug = Astro.url.searchParams.get('edit');
 		localStorage.setItem(draftKey, JSON.stringify(drafts));
 		const method = loadedServerSlug ? 'PUT' : 'POST';
 		const endpoint = loadedServerSlug ? `/api/posts/${encodeURIComponent(loadedServerSlug)}` : '/api/posts';
-		const response = await fetch(endpoint, { method, credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() }, body: JSON.stringify({ title: post.title, slug: post.slug, excerpt: post.excerpt, body: post.content, category: post.category, tags: post.tags, status, scheduledAt: post.scheduledAt ? new Date(post.scheduledAt).toISOString() : null, coverUrl: post.coverUrl || null, socialTitle: post.socialTitle || null, socialDescription: post.socialDescription || null }) });
+		const response = await fetch(endpoint, { method, credentials: 'include', headers: { 'content-type': 'application/json', 'x-csrf-token': getCsrfToken() }, body: JSON.stringify({ title: post.title, slug: post.slug, excerpt: post.excerpt, body: post.content, category: post.category, tags: post.tags, status, coverUrl: post.coverUrl || null, socialTitle: post.socialTitle || null, socialDescription: post.socialDescription || null }) });
 		if (!response.ok) throw new Error('post_save_failed');
 		loadedServerSlug = post.slug;
 		await refreshPostManager();
@@ -308,16 +310,18 @@ const editSlug = Astro.url.searchParams.get('edit');
 		formData.append('file', file);
 		const response = await fetch('/api/media', { method: 'POST', credentials: 'include', headers: { 'x-csrf-token': getCsrfToken() }, body: formData });
 		if (!response.ok) throw new Error('media_upload_failed');
-		const data = await response.json() as { url: string };
+		const data = await response.json() as { url: string; srcset?: string };
 		if (coverUrl) coverUrl.value = data.url;
-		if (content) content.value += `${content.value ? '\n\n' : ''}![${file.name}](${data.url})`;
+		const escapedAlt = file.name.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+		const imageMarkup = data.srcset ? `<img src="${data.url}" srcset="${data.srcset}" sizes="(max-width: 768px) 100vw, 768px" alt="${escapedAlt}" loading="lazy">` : `![${file.name}](${data.url})`;
+		if (content) content.value += `${content.value ? '\n\n' : ''}${imageMarkup}`;
 		renderPreview();
 		setStatus('media uploaded and inserted', true);
 	}
 
 	getLocalCategories().forEach((localCategory: LocalCategory) => category?.add(new Option(localCategory.name, localCategory.slug)));
 
-	[title, category, slug, excerpt, content, postStatus, scheduledAt, tags, coverUrl, socialTitle, socialDescription].forEach((field) => field?.addEventListener('input', () => {
+	[title, category, slug, excerpt, content, postStatus, tags, coverUrl, socialTitle, socialDescription].forEach((field) => field?.addEventListener('input', () => {
 		renderPreview();
 		const post = currentPost();
 		if (post.slug || post.title || post.content) localStorage.setItem(draftKey, JSON.stringify({ ...getDrafts(), [post.slug || 'new']: post }));
@@ -371,7 +375,10 @@ const editSlug = Astro.url.searchParams.get('edit');
 		if (authError) authError.hidden = true;
 		const response = await fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: loginPassword?.value || '' }) });
 		if (!response.ok) {
-			if (authError) authError.hidden = false;
+			if (authError) {
+				authError.textContent = response.status === 429 ? '로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.' : '패스워드가 올바르지 않습니다.';
+				authError.hidden = false;
+			}
 			return;
 		}
 		unlockEditor();
@@ -436,7 +443,6 @@ const editSlug = Astro.url.searchParams.get('edit');
 	.managed-slug { display:block; margin-top:13px; color:var(--faint); font:.58rem 'DM Mono',monospace; }
 	.status-pill { padding:5px 8px; border-radius:2px; font-size:.56rem; letter-spacing:.08em; }
 	.status-pill.published { color:var(--cyan); border-color:rgba(98,220,232,.45); background:rgba(98,220,232,.08); }
-	.status-pill.scheduled { color:var(--violet); border-color:rgba(167,155,255,.45); background:rgba(167,155,255,.08); }
 	.status-pill.unpublished, .status-pill.deleted { color:#ef8b9d; border-color:rgba(239,139,157,.4); background:rgba(239,139,157,.07); }
 	.managed-actions { grid-column:2; align-self:end; display:flex; align-items:center; gap:12px; padding-top:18px; }
 	.managed-edit, .managed-delete { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:9px 14px; border-radius:3px; font-size:.62rem; transition:background .2s, border-color .2s, color .2s, transform .2s; }

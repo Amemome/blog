@@ -1,0 +1,17 @@
+[Unit]
+Description=Orbital Notes Astro Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/blog
+EnvironmentFile=/var/www/blog/.env
+Environment=HOST=127.0.0.1
+Environment=PORT=4321
+ExecStart=/usr/bin/node /var/www/blog/dist/server/entry.mjs
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

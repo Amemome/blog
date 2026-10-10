@@ -1,12 +1,19 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { APIRoute } from 'astro';
+import { getSession } from '../../lib/server/auth';
+import { db } from '../../lib/server/db';
 import { mediaDirectory } from '../../lib/server/storage';
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async (context) => {
+	const { params } = context;
 	const relativePath = params.path ?? '';
 	const filePath = path.resolve(mediaDirectory, relativePath);
 	if (!filePath.startsWith(`${mediaDirectory}${path.sep}`)) return new Response(null, { status: 404 });
+	const session = getSession(context);
+	const mediaUrl = `/media/${relativePath}`;
+	const publishedReference = db.prepare("SELECT 1 FROM posts WHERE status = 'published' AND (cover_url = ? OR body LIKE '%' || ? || '%') LIMIT 1").get(mediaUrl, mediaUrl);
+	if (!session && !publishedReference) return new Response(null, { status: 404 });
 	try {
 		const file = await readFile(filePath);
 		const extension = path.extname(filePath).toLowerCase();

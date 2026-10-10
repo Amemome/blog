@@ -2,8 +2,8 @@ import { db, serializePost, type PostRecord, type PostStatus } from '../../../li
 import { json, readJson, requireSession, route } from '../../../lib/server/http';
 import { recordAuthEvent } from '../../../lib/server/auth';
 
-type PostInput = { title?: string; slug?: string; excerpt?: string; body?: string; category?: string; tags?: string[]; status?: PostStatus; publishedAt?: string | null; scheduledAt?: string | null; coverUrl?: string | null; socialTitle?: string | null; socialDescription?: string | null };
-const validStatuses = new Set<PostStatus>(['draft', 'published', 'unpublished', 'scheduled', 'deleted']);
+type PostInput = { title?: string; slug?: string; excerpt?: string; body?: string; category?: string; tags?: string[]; status?: PostStatus; publishedAt?: string | null; coverUrl?: string | null; socialTitle?: string | null; socialDescription?: string | null };
+const validStatuses = new Set<PostStatus>(['draft', 'published', 'unpublished', 'deleted']);
 
 export const GET = route(async (context) => {
 	const slug = context.params.slug;
@@ -24,12 +24,11 @@ export const PUT = route(async (context) => {
 	if (body.status && !validStatuses.has(body.status)) return json({ error: 'invalid_status' }, 400);
 	const nextSlug = body.slug?.trim() || current.slug;
 	const nextStatus = body.status ?? current.status;
-	if (nextStatus === 'scheduled' && (!body.scheduledAt || Number.isNaN(Date.parse(body.scheduledAt)))) return json({ error: 'scheduled_at_required' }, 400);
 	const now = new Date().toISOString();
 	const snapshot = JSON.stringify(serializePost(current));
 	try {
 		db.transaction(() => {
-			db.prepare(`UPDATE posts SET title = ?, slug = ?, excerpt = ?, body = ?, category_slug = ?, tags = ?, cover_url = ?, social_title = ?, social_description = ?, status = ?, published_at = ?, scheduled_at = ?, updated_at = ? WHERE id = ?`).run(
+			db.prepare(`UPDATE posts SET title = ?, slug = ?, excerpt = ?, body = ?, category_slug = ?, tags = ?, cover_url = ?, social_title = ?, social_description = ?, status = ?, published_at = ?, updated_at = ? WHERE id = ?`).run(
 				body.title?.trim() || current.title,
 				nextSlug,
 				body.excerpt?.trim() ?? current.excerpt,
@@ -41,7 +40,6 @@ export const PUT = route(async (context) => {
 				body.socialDescription?.trim() ?? current.social_description,
 				nextStatus,
 				nextStatus === 'published' ? body.publishedAt ?? current.published_at ?? now : null,
-				nextStatus === 'scheduled' ? body.scheduledAt : null,
 				now,
 				current.id,
 			);

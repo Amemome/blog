@@ -4,7 +4,7 @@ import { json, readJson, route } from '../../../lib/server/http';
 type LoginBody = { password?: string };
 
 export const POST = route(async (context) => {
-	const ip = context.clientAddress ?? context.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
+	const ip = context.request.headers.get('x-real-ip')?.trim() || context.clientAddress || context.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
 	if (!loginAllowed(ip || 'unknown')) return json({ error: 'too_many_attempts' }, 429);
 	const body = await readJson<LoginBody>(context.request);
 	if (!body.password || !authenticate(body.password)) {
